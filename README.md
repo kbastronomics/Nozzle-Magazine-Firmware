@@ -1,2 +1,2 @@
 # nzmag
-Deltaprintr Nozzle Magazine Firmware for Trinket M0 + 8871 Mote Driver (GCODE Based)
+Deltaprintr Nozzle Magazine Firmware for Trinket M0 + 8871 Moter Driver (GCODE Based)
