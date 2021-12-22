@@ -1,6 +1,6 @@
 /**********************************************************************************************
  * Deltaprinter Nozzle Magazine Driver - version 1.0
- * by Sandra Carroll <smgvbest@gmail.com> https://github.com/smgvbest/nzholder
+ * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/nzmag
  *
  * This Library is licensed under a GPLv3 License
  **********************************************************************************************/
