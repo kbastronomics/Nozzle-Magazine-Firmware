@@ -8,87 +8,7 @@
 #include "nzholder.h"
 
 // begin callback functions,   all implemented as blocking calls
-void estop() {
-  // M112
-  digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
-  GCode.comment(">M112");
-  deltaprintr_motor.breakdown(nBreak);
-  GCode.comment("E-STOP");
-  GCode.comment("OK");
-  digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
-}
-
-void reportFirmware() {
-  // M115 report firmware 
-  digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
-  GCode.comment(">M115");
-  Serial.println("FIRMWARE_NAME:Nozzle Magazine 1.0.0 (Github) SOURCE_CODE_URL:https://github.com/smgvbest/nzmag PROTOCOL_VERSION:1.0 MACHINE_TYPE:deltaprintr nozzle magazine NOZZLE_COUNT:20");
-  GCode.comment("OK");
-  digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
-}
-
-
-void reportPostion() {
-  String state="";
-  // M114 
-  digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
-  //  get current state of limit switch's
-  GCode.comment(">M114");
-  if (digitalRead(LIMIT_OPEN) == LOW ) { 
-    state = "Open"; 
-  }
-  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
-    state = "Closed"; 
-  }
-  // Send report
-  GCode.comment("Reporting Current Position");
-  Serial.print("N:");
-  Serial.println(state);
-  // Send final OK message
-  GCode.comment("OK");
-  digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
-}
-
-void endStopState() {
-  // M119 
-  String n_min="OPEN", n_max="OPEN";
-
-  digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
-  GCode.comment(">M119");
-  if (digitalRead(LIMIT_OPEN) == LOW ) { 
-    n_max = "TRIGGERED"; 
-  }
-
-  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
-    n_min = "TRIGGERED"; 
-  }
-
-  GCode.comment("Reporting Endstop State");
-  Serial.print("n_min:");
-  Serial.println(n_min);    // n_min is closed position
-  Serial.print("n_max:");
-  Serial.println(n_max);    // n_max is open position
-  GCode.comment("OK");
-  digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
-}
-
-int checkAS() {
+int checkASB() {
   int nSpeedtmp=nSpeed;
   int nAccellerationtmp=nAcceleration;
   int nBreaktmp=nBreak;
@@ -142,14 +62,97 @@ int checkAS() {
  return rc;
 }
 
-void setFeedrate() {
+
+void M112_estop() {
+  // M112
+  digitalWrite(LEDpin, HIGH);
+  // strip.SetPixelColor(1, green);
+  // strip.Show();
+  GCode.comment(">M112");
+  deltaprintr_motor.breakdown(nBreak);
+  GCode.comment("E-STOP");
+  GCode.comment("OK");
+  digitalWrite(LEDpin, LOW);
+  // strip.SetPixelColor(1, black);
+  // strip.Show();
+}
+
+void M114_reportPostion() {
+  String state="";
+  // M114 
+  digitalWrite(LEDpin, HIGH);
+  // strip.SetPixelColor(1, green);
+  // strip.Show();
+  //  get current state of limit switch's
+  GCode.comment(">M114");
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    state = "Open"; 
+  }
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+    state = "Closed"; 
+  }
+  // Send report
+  GCode.comment("Reporting Current Position");
+  Serial.print("N:");
+  Serial.println(state);
+  // Send final OK message
+  GCode.comment("OK");
+  digitalWrite(LEDpin, LOW);
+  // strip.SetPixelColor(1, black);
+  // strip.Show();
+}
+
+
+void M115_reportFirmware() {
+  // M115 report firmware 
+  digitalWrite(LEDpin, HIGH);
+  // strip.SetPixelColor(1, green);
+  // strip.Show();
+  GCode.comment(">M115");
+  Serial.println("FIRMWARE_NAME:Nozzle Magazine 1.0.0 (Github) SOURCE_CODE_URL:https://github.com/kbastronomics/nzmag PROTOCOL_VERSION:1.0 MACHINE_TYPE:deltaprintr nozzle magazine NOZZLE_COUNT:20");
+  GCode.comment("OK");
+  digitalWrite(LEDpin, LOW);
+  // strip.SetPixelColor(1, black);
+  // strip.Show();
+}
+
+
+
+void M119_endStopState() {
+  // M119 
+  String n_min="OPEN", n_max="OPEN";
+
+  digitalWrite(LEDpin, HIGH);
+  // strip.SetPixelColor(1, green);
+  // strip.Show();
+  GCode.comment(">M119");
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    n_max = "TRIGGERED"; 
+  }
+
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+    n_min = "TRIGGERED"; 
+  }
+
+  GCode.comment("Reporting Endstop State");
+  Serial.print("n_min:");
+  Serial.println(n_min);    // n_min is closed position
+  Serial.print("n_max:");
+  Serial.println(n_max);    // n_max is open position
+  GCode.comment("OK");
+  digitalWrite(LEDpin, LOW);
+  // strip.SetPixelColor(1, black);
+  // strip.Show();
+}
+
+void M220_setFeedrate() {
   // M220 [S<percent>] [A<percent>]
 
   digitalWrite(LEDpin, HIGH);
   // strip.SetPixelColor(1, green);
   // strip.Show();
 
-  if ( checkAS() == 1) { // ERROR So do nothing
+  if ( checkASB() == 1) { // ERROR So do nothing
     return;
   }
 
@@ -168,7 +171,7 @@ void setFeedrate() {
   // strip.Show();
 }
 
-void openNozzleholdder() {
+void M804_openNozzleholdder() {
   // M804  [S<percent>] [A<percent>]
 
   digitalWrite(LEDpin, HIGH);
@@ -176,7 +179,7 @@ void openNozzleholdder() {
   // strip.Show();
   GCode.comment(">M804");
 
-   if ( checkAS() == 1 ) {
+   if ( checkASB() == 1 ) {
     return;
   }
   
@@ -200,7 +203,7 @@ void openNozzleholdder() {
   // strip.Show();
 }
 
-void closeNozzleholdder() {
+void M805_closeNozzleholdder() {
   // M805 [S<percent>] [A<percent>]
  
   digitalWrite(LEDpin, HIGH);
@@ -208,7 +211,7 @@ void closeNozzleholdder() {
   // strip.Show();
   GCode.comment(">M805");
   
-  if ( checkAS() == 1 ) {
+  if ( checkASB() == 1 ) {
     return;
   }
   

@@ -1,6 +1,6 @@
 /**********************************************************************************************
  * Deltaprinter Nozzle Magazine Driver - version 1.0
- * by Sandra Carroll <smgvbest@gmail.com> https://github.com/smgvbest/nzmag
+ * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/nzmag
  *
  * This Library is licensed under a GPLv3 License
  **********************************************************************************************/
@@ -39,14 +39,14 @@
 #endif
 
 // declarations
-int checkAS();              // SUPPORT FUNCTION
-void estop();               // M112
-void reportPostion();       // M114
-void reportFirmware();      // M115
-void endStopState();        // M119
-void setFeedrate();         // M220
-void openNozzleholdder();   // M804
-void closeNozzleholdder();  // M805
+int checkASB();              // SUPPORT FUNCTION
+void M112_estop();               // M112
+void M114_reportPostion();       // M114
+void M115_reportFirmware();      // M115
+void M119_endStopState();        // M119
+void M220_setFeedrate();         // M220
+void M804_openNozzleholdder();   // M804
+void M805_closeNozzleholdder();  // M805
 
 DRV8871 deltaprintr_motor(
     MOTOR_IN1,
@@ -59,13 +59,13 @@ int nBreak=0;             // STOP IMMEDIATE
 #define NumberOfCommands 7
 
 commandscallback commands[NumberOfCommands] = {
-    {"M112", estop},             // M112
-    {"M114", reportPostion},     // M114
-    {"M115", reportFirmware},    // M115
-    {"M119", endStopState},      // M119
-    {"M220", setFeedrate},       // M220 S<PERCENT> A<PERCENT> B<VALUE>
-    {"M804", openNozzleholdder}, // M804 S<PERCENT> A<PERCENT> B<VALUE>
-    {"M805", closeNozzleholdder} // M805 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M112", M112_estop},             // M112
+    {"M114", M114_reportPostion},     // M114
+    {"M115", M115_reportFirmware},    // M115
+    {"M119", M119_endStopState},      // M119
+    {"M220", M220_setFeedrate},       // M220 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M804", M804_openNozzleholdder}, // M804 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M805", M805_closeNozzleholdder} // M805 S<PERCENT> A<PERCENT> B<VALUE>
 };
 
 // SAMPLE INIT STRING
