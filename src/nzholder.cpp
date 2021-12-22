@@ -1,5 +1,5 @@
 /**********************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 1.0
+ * Deltaprinter Nozzle Magazine Driver - version 0.0.6b
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/nzmag
  *
  * This Library is licensed under a GPLv3 License
@@ -92,7 +92,7 @@ void M114_reportPostion() {
     state = "Closed"; 
   }
   // Send report
-  GCode.comment("Reporting Current Position");
+  //GCode.comment("Reporting Current Position");
   Serial.print("N:");
   Serial.println(state);
   // Send final OK message
@@ -104,12 +104,15 @@ void M114_reportPostion() {
 
 
 void M115_reportFirmware() {
+  char buffer[200];
+
   // M115 report firmware 
   digitalWrite(LEDpin, HIGH);
   // strip.SetPixelColor(1, green);
   // strip.Show();
+  sprintf(buffer,"FIRMWARE_NAME:%s %s (Github) SOURCE_CODE_URL:https://github.com/kbastronomics/nzmag PROTOCOL_VERSION:%s MACHINE_TYPE:%s NOZZLE_COUNT:%d",FIRMWARE_NAME, FIRMWARE_VERSION, PROTOCOL_VERSION,MACHINE_TYPE,NOZZLE_COUNT);
   GCode.comment(">M115");
-  Serial.println("FIRMWARE_NAME:Nozzle Magazine 1.0.0 (Github) SOURCE_CODE_URL:https://github.com/kbastronomics/nzmag PROTOCOL_VERSION:1.0 MACHINE_TYPE:deltaprintr nozzle magazine NOZZLE_COUNT:20");
+  Serial.println(buffer);
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
   // strip.SetPixelColor(1, black);

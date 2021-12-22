@@ -1,5 +1,5 @@
 /**********************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 1.0
+ * Deltaprinter Nozzle Magazine Driver - version 0.0.6b
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/nzmag
  *
  * This Library is licensed under a GPLv3 License
@@ -10,12 +10,12 @@
 #include <gcode.h>   // https://github.com/tinkersprojects/G-Code-Arduino-Library
 
 // FIRMWARE INFORMAITON
-#define FIRMWARE_NAME     "Nozzle Magazine"
-#define FIRMWARE_VERSION   1.0.0
-#define NOZZLE_COUNT      20
-//#define NOZZLE_COUNT 10
-#define PROTOCOL_VERSION 1.0
-#define MACHINE_TYPE "Deltaprintr nozzle magazinw"
+#define FIRMWARE_NAME       "Nozzle Magazine"
+#define FIRMWARE_VERSION    "0.0.6b"
+#define MACHINE_TYPE        "Deltaprintr nozzle magazine (large)"
+#define NOZZLE_COUNT        20
+#define PROTOCOL_VERSION    "1.0"
+
 
 #define LEDpin LED_BUILTIN
 
