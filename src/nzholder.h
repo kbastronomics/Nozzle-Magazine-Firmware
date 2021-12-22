@@ -9,12 +9,17 @@
 #include <DRV8871.h> // https://github.com/dirkk1980/arduino_adafruit-drv8871
 #include <gcode.h>   // https://github.com/tinkersprojects/G-Code-Arduino-Library
 
+// SET DEBUG TO 1 FOR ADDITIONAL MESSAGES
+#define DEBUG 0
+
 // FIRMWARE INFORMAITON
 #define FIRMWARE_NAME       "Nozzle Magazine"
 #define FIRMWARE_VERSION    "0.0.6b"
 #define MACHINE_TYPE        "Deltaprintr nozzle magazine (large)"
 #define NOZZLE_COUNT        20
 #define PROTOCOL_VERSION    "1.0"
+#define MOTOR_DRIVE         "DRV8871"
+#define CONTROL_BOARD       "ADAFRUIT_METRO_M0_EXPRESS"
 
 
 #define LEDpin LED_BUILTIN
@@ -69,5 +74,6 @@ commandscallback commands[NumberOfCommands] = {
 };
 
 // SAMPLE INIT STRING
-// M115 M220 S30 A10 B0 M114 
+// GET FIRNWARE INFO, SET SPEED/ACCEL/BREAK, Check Position and Make sure closed
+// M115 M220 S75 A10 B0 M114 M805
 gcode GCode(NumberOfCommands, commands);

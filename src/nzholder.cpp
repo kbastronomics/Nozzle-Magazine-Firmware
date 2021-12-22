@@ -25,8 +25,6 @@ int checkASB() {
         GCode.comment("Error: S Value out of range"); 
         nSpeed=nSpeedtmp;
         GCode.comment("OK");
-        // strip.SetPixelColor(1, red);
-        // strip.Show();
         return 1;
       }
     rc = 2;
@@ -38,13 +36,10 @@ int checkASB() {
         GCode.comment("Error: A Value out of range");
         nAcceleration = nAccellerationtmp;
         GCode.comment("OK");
-        // strip.SetPixelColor(1, red);
-        // strip.Show();
         return 1;
       }
    rc = 3;
   } 
-
   // if [B<value>] is sent get the value and save it
   if(GCode.availableValue('B'))   {
     nBreak = (int) GCode.GetValue('B');
@@ -52,37 +47,28 @@ int checkASB() {
         GCode.comment("Error: B Value out of range");
         nBreak = nBreaktmp;
         GCode.comment("OK");
-        // strip.SetPixelColor(1, red);
-        // strip.Show();
         return 1;
       }
    rc = 4;
   } 
-
  return rc;
 }
 
 
 void M112_estop() {
-  // M112
+
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
   GCode.comment(">M112");
   deltaprintr_motor.breakdown(nBreak);
   GCode.comment("E-STOP");
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 void M114_reportPostion() {
   String state="";
-  // M114 
+
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
   //  get current state of limit switch's
   GCode.comment(">M114");
   if (digitalRead(LIMIT_OPEN) == LOW ) { 
@@ -92,42 +78,31 @@ void M114_reportPostion() {
     state = "Closed"; 
   }
   // Send report
-  //GCode.comment("Reporting Current Position");
   Serial.print("N:");
   Serial.println(state);
   // Send final OK message
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 
 void M115_reportFirmware() {
-  char buffer[200];
+  char buffer[300];
 
-  // M115 report firmware 
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
-  sprintf(buffer,"FIRMWARE_NAME:%s %s (Github) SOURCE_CODE_URL:https://github.com/kbastronomics/nzmag PROTOCOL_VERSION:%s MACHINE_TYPE:%s NOZZLE_COUNT:%d",FIRMWARE_NAME, FIRMWARE_VERSION, PROTOCOL_VERSION,MACHINE_TYPE,NOZZLE_COUNT);
+  sprintf(buffer,"FIRMWARE_NAME:%s %s (Github) SOURCE_CODE_URL:https://github.com/kbastronomics/nzmag PROTOCOL_VERSION:%s MACHINE_TYPE:%s NOZZLE_COUNT:%d CONTROL_BOARD:%s MOTOR_DRIVE:%s",FIRMWARE_NAME, FIRMWARE_VERSION, PROTOCOL_VERSION,MACHINE_TYPE,NOZZLE_COUNT,CONTROL_BOARD,MOTOR_DRIVE);
   GCode.comment(">M115");
   Serial.println(buffer);
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 
 
 void M119_endStopState() {
-  // M119 
   String n_min="OPEN", n_max="OPEN";
 
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
   GCode.comment(">M119");
   if (digitalRead(LIMIT_OPEN) == LOW ) { 
     n_max = "TRIGGERED"; 
@@ -144,16 +119,15 @@ void M119_endStopState() {
   Serial.println(n_max);    // n_max is open position
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
+//
+// M220_setFeedrate
+// FUNCTION SETS GLOBAL VARIABLES ONLY
+//
 void M220_setFeedrate() {
-  // M220 [S<percent>] [A<percent>]
 
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
 
   if ( checkASB() == 1) { // ERROR So do nothing
     return;
@@ -170,87 +144,74 @@ void M220_setFeedrate() {
 
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 void M804_openNozzleholdder() {
-  // M804  [S<percent>] [A<percent>]
 
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
   GCode.comment(">M804");
 
    if ( checkASB() == 1 ) {
     return;
   }
   
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
   // execute gcode command
   deltaprintr_motor.drive(nSpeed, deltaprintr_motor.DIRECTION_FORWARD, nAcceleration);
-
-  // report command
-  Serial.print("S:");
-  Serial.print(deltaprintr_motor.currentSpeed());
-  Serial.print(" A:");
-  Serial.print(nAcceleration);
-  Serial.print(" D:");
-  Serial.println(deltaprintr_motor.currentDirection());
-
+  if ( DEBUG == 1 ) {
+    Serial.print("S:");
+    Serial.print(deltaprintr_motor.currentSpeed());
+    Serial.print(" A:");
+    Serial.print(nAcceleration);
+    Serial.print(" D:");
+    Serial.println(deltaprintr_motor.currentDirection());
+  }
   while( digitalRead(LIMIT_OPEN) == HIGH )  { } // wait for LIMIT_OPEN switch to hit and ignore the LIMIT_CLOSE switch 
   deltaprintr_motor.breakdown(nBreak);   // Hard Stop (should I allow this to be overridden???)
+  }
   GCode.comment("Open");
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 void M805_closeNozzleholdder() {
-  // M805 [S<percent>] [A<percent>]
  
   digitalWrite(LEDpin, HIGH);
-  // strip.SetPixelColor(1, green);
-  // strip.Show();
   GCode.comment(">M805");
   
   if ( checkASB() == 1 ) {
     return;
   }
-  
-  deltaprintr_motor.drive(nSpeed,deltaprintr_motor.DIRECTION_BACKWARD, nAcceleration);
-  Serial.print("S:");
-  Serial.println(deltaprintr_motor.currentSpeed());
-  Serial.print(" D:");
-  Serial.println(deltaprintr_motor.currentDirection());
-  while( digitalRead(LIMIT_CLOSE) == HIGH ) { }
-  deltaprintr_motor.breakdown(nBreak);  // Default is Hard Stop (should I allow this to be overridden???)
+  // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    deltaprintr_motor.drive(nSpeed,deltaprintr_motor.DIRECTION_BACKWARD, nAcceleration);
+    if ( DEBUG == 1 ) {
+      Serial.print("S:");
+      Serial.print(deltaprintr_motor.currentSpeed());
+      Serial.print(" A:");
+      Serial.print(nAcceleration);
+      Serial.print(" D:");
+      Serial.println(deltaprintr_motor.currentDirection());
+    }
+    while( digitalRead(LIMIT_CLOSE) == HIGH ) { }
+    deltaprintr_motor.breakdown(nBreak);  // Default is Hard Stop (should I allow this to be overridden???)
+  }   
   GCode.comment("Closed");
   GCode.comment("OK");
   digitalWrite(LEDpin, LOW);
-  // strip.SetPixelColor(1, black);
-  // strip.Show();
 }
 
 // begin setup
 
 void setup() { 
-  // put your setup code here, to run once:
-  // Serial.begin(19200);  
-  // Serial.println("Nozzle Magazine V1 G-Code Driver");
-  GCode.begin(19200, ">"); //responce => ok, rs or !!
+  GCode.begin(115200, ">"); //responce => ok, rs or !!
   pinMode(LEDpin, OUTPUT);
   pinMode(LIMIT_CLOSE,INPUT_PULLUP);
   pinMode(LIMIT_OPEN,INPUT_PULLUP);
-
-  // strip.Begin();
-  // strip.ClearTo(green);
-  // strip.Show();
 }
 
 // begin loop
 void loop() {
-  // put your main code here, to run repeatedly:
 
   GCode.available();
 
