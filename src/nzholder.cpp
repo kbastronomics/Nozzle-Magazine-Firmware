@@ -33,9 +33,13 @@ int checkASB() {
         Serial.println("OK");
         return 1;
       }
+
+      if ( nSpeed <= 30) { 
+        nSpeed = 30; 
+      }
     rc = 2;
   }
-  // if [A<percent>] is sent get the value and save it
+  // if [A<Milliseconds>] is sent get the value and save it
   if(GCode.availableValue('A'))   {
     nAcceleration = (int) GCode.GetValue('A');
       if (nAcceleration < 0 || nAcceleration > 1000 ) {

@@ -48,7 +48,7 @@ void DRV8871::drive(byte targetSpeed, byte direction, int acceleration)
   }
 }
 
-void DRV8871::breakdown(byte targetSpeed, int acceleration)
+void DRV8871::brakedown(byte targetSpeed, int acceleration)
 {
   if (_currentDirection == DIRECTION_FORWARD)
   {
@@ -106,6 +106,12 @@ void DRV8871::rampDownBackward(byte targetSpeed, int acceleration)
     _currentSpeed = i;
     delay(acceleration);
   }
+}
+
+void DRV8871::brake ()
+{
+  digitalWrite(_motorIN1Pin, HIGH);
+  digitalWrite(_motorIN2Pin, HIGH);
 }
 
 byte DRV8871::currentSpeed ()

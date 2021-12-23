@@ -69,10 +69,10 @@ commandscallback commands[NumberOfCommands] = {
     {"M114", M114_reportPostion},     // M114
     {"M115", M115_reportFirmware},    // M115
     {"M119", M119_endStopState},      // M119
-    {"M220", M220_setFeedrate},       // M220 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M220", M220_setFeedrate},       // M220 S<PERCENT> A<MILLISECONDS> B<VALUE>
     {"M303", M303_autotune},          // M303 C<COUNT> DEFAULTS IS 5
-    {"M804", M804_openNozzlemagazine}, // M804 S<PERCENT> A<PERCENT> B<VALUE>
-    {"M805", M805_closeNozzlemagazine} // M805 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M804", M804_openNozzlemagazine}, // M804 S<PERCENT> AMILLISECONDS> B<VALUE>
+    {"M805", M805_closeNozzlemagazine} // M805 S<PERCENT> A<MILLISECONDS> B<VALUE>
 };
 
 // SAMPLE INIT STRING

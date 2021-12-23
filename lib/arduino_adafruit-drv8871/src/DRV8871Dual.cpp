@@ -35,6 +35,6 @@ void DRV8871Dual::turn (byte speed, byte direction)
 
 void DRV8871Dual::breakdown (byte targetSpeed)
 {
-  _motor1->breakdown(targetSpeed, 0);
-  _motor2->breakdown(targetSpeed, 0);
+  _motor1->brakedown(targetSpeed, 0);
+  _motor2->brakedown(targetSpeed, 0);
 }

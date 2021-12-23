@@ -18,7 +18,9 @@ class DRV8871
     const byte DIRECTION_FORWARD = 1;
     const byte DIRECTION_BACKWARD = 2;
     void drive(byte targetSpeed, byte direction, int acceleration);
-    void breakdown(byte targetSpeed = 0, int acceleration = 0);
+    void brakedown(byte targetSpeed = 0, int acceleration = 0);
+    void coast();
+    void brake();
     byte currentSpeed();
     byte currentDirection();
   private:
