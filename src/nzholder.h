@@ -44,14 +44,15 @@
 #endif
 
 // declarations
-int checkASB();              // SUPPORT FUNCTION
+int checkASB();                  // SUPPORT FUNCTIOn
 void M112_estop();               // M112
 void M114_reportPostion();       // M114
 void M115_reportFirmware();      // M115
 void M119_endStopState();        // M119
 void M220_setFeedrate();         // M220
-void M804_openNozzleholdder();   // M804
-void M805_closeNozzleholdder();  // M805
+void M303_autotune();            // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
+void M804_openNozzlemagazine();   // M804
+void M805_closeNozzlemagazine();  // M805
 
 DRV8871 deltaprintr_motor(
     MOTOR_IN1,
@@ -61,7 +62,7 @@ int nSpeed = 75;          // NOT FASTEST
 int nAcceleration = 10;   // QUICK ACCEL
 int nBreak=0;             // STOP IMMEDIATE
 
-#define NumberOfCommands 7
+#define NumberOfCommands 8
 
 commandscallback commands[NumberOfCommands] = {
     {"M112", M112_estop},             // M112
@@ -69,11 +70,13 @@ commandscallback commands[NumberOfCommands] = {
     {"M115", M115_reportFirmware},    // M115
     {"M119", M119_endStopState},      // M119
     {"M220", M220_setFeedrate},       // M220 S<PERCENT> A<PERCENT> B<VALUE>
-    {"M804", M804_openNozzleholdder}, // M804 S<PERCENT> A<PERCENT> B<VALUE>
-    {"M805", M805_closeNozzleholdder} // M805 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M303", M303_autotune},          // M303 C<COUNT> DEFAULTS IS 5
+    {"M804", M804_openNozzlemagazine}, // M804 S<PERCENT> A<PERCENT> B<VALUE>
+    {"M805", M805_closeNozzlemagazine} // M805 S<PERCENT> A<PERCENT> B<VALUE>
 };
 
 // SAMPLE INIT STRING
 // GET FIRNWARE INFO, SET SPEED/ACCEL/BREAK, Check Position and Make sure closed
 // M115 M220 S75 A10 B0 M114 M805
+
 gcode GCode(NumberOfCommands, commands);
