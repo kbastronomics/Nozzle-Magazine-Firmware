@@ -45,9 +45,9 @@
 void isr_limitOpen();             // ISR for LIMIT_OPEN
 void isr_limitClose();            // ISR for LIMIT_CLOSED
 void isr_estop();                 // ISR for ESTOP
-int checkASBT();                  // SUPPORT FUNCTION
+int  checkParms();                // SUPPORT FUNCTION TO READ COMMON PARMS
 void G4_pause();                  // G4 S<VALUE>
-void M111_debug();                // M111 P<MODULE> S<LEVEL>
+void M111_debug();                // M111 P<MODULE> L<LEVEL>
 void M112_estop();                // M112
 void M114_reportPostion();        // M114
 void M115_reportFirmware();       // M115
