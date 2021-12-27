@@ -1,19 +1,51 @@
 /**************************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 0.6.0b
+ * Deltaprinter Nozzle Magazine Driver - version 0.7.0b
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
  *
  * This Library is licensed under a GPLv3 License
  **************************************************************************************************/
+#ifndef nzholder_h
+#define nzholder_h
+   
 
 #include <Arduino.h>
 #include <DRV8871.h> // https://github.com/dirkk1980/arduino_adafruit-drv8871
 #include <gcode.h>   // https://github.com/tinkersprojects/G-Code-Arduino-Library
 
+// To add current monitoring uncomment the #define __USE_INA219__ in the main file
+#ifdef __USE_INA219__
+#include <Adafruit_INA219.h>
+
+float total_mA;
+unsigned long total_sec;
+float shuntvoltage;
+float busvoltage;
+float current_mA;
+float loadvoltage;
+float power_mW;
+float total_mAH;
+
+Adafruit_INA219 ina219;
+
+void read_ina219();
+#endif
+
+// TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
+#ifdef __USE_EEPROM__
+
+#endif
+
+// TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
+#ifdef __USE_ESTOP_SWITCH__
+
+#endif
+
+
 // FIRMWARE INFORMAITON
 #define FIRMWARE_NAME       "Nozzle Magazine"
 #define GITHUB_URL          "https://github.com/kbastronomics/Nozzle-Magazine-Firmware"
-#define FIRMWARE_VERSION    "0.6.0b"
-#define MACHINE_TYPE        "Deltaprintr nozzle magazine (large)"
+#define FIRMWARE_VERSION    "0.7.0b"
+#define MACHINE_TYPE        "Deltaprintr Nozzle Magazine (large)"
 #define NOZZLE_COUNT        20
 #define PROTOCOL_VERSION    "1.0"
 #define MOTOR_DRIVER        "DRV8871"
@@ -21,31 +53,46 @@
 #define UUID                "6fc71526-82e3-4c48-b30d-5c81313cd1fd"
 #define LEDpin              LED_BUILTIN
 
-//#define __USE_INTERRUPTS__
 
 //pin configuration for Adafruit Metro Express
 #ifdef ADAFRUIT_METRO_M0_EXPRESS
-#define MOTOR_IN1   9
-#define MOTOR_IN2   10
-#define LIMIT_CLOSE 11
-#define LIMIT_OPEN  12
-#define ESTOP       13
+    #define MOTOR_IN1        9
+    #define MOTOR_IN2       10
+    #define LIMIT_CLOSE     11
+    #define LIMIT_OPEN      12
+    #ifdef __USE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH    7
+    #endif
 #endif
 
 //pin configuration for Adafruit Trinket M0
 #ifdef ADAFRUIT_TRINKET_M0
-#define MOTOR_IN1   4
-#define MOTOR_IN2   5
-#define LIMIT_CLOSE 2
-#define LIMIT_OPEN  3
-#define ESTOP       0
+    #define MOTOR_IN1       4
+    #define MOTOR_IN2       5
+    #define LIMIT_CLOSE     2
+    #ifdef __USE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH    0
+    #endif
 #endif
+
+//pin configuration for the KBAstronomic Nozzle Magazine Control Board
+#ifdef KBASTRO_NOZZLE_MAGAZINE
+    #define MOTOR_IN1       4
+    #define MOTOR_IN2       5
+    #define LIMIT_CLOSE     2
+    #define LIMIT_OPEN      3
+    #define CURRENT_SENSE   6
+    #ifdef __USE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH    0
+    #endif
+#endif
+
 
 // declarations
 void isr_limitOpen();             // ISR for LIMIT_OPEN
 void isr_limitClose();            // ISR for LIMIT_CLOSED
 void isr_estop();                 // ISR for ESTOP
-int  checkParms();                // SUPPORT FUNCTION TO READ COMMON PARMS
+int  checkParms();                // SUPPORT FUNCTION TO READ COMMON PARMS               
 void G4_pause();                  // G4 S<VALUE>
 void M111_debug();                // M111 P<MODULE> L<LEVEL>
 void M112_estop();                // M112
@@ -56,26 +103,28 @@ void M220_setFeedrate();          // M220 S<VALUE> A<VALUE> D<VALUE>
 void M303_autotune();             // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
 void M804_openNozzlemagazine();   // M804 S<VALUE> A<VALUE> D<VALUE>
 void M805_closeNozzlemagazine();  // M805 S<VALUE> A<VALUE> D<VALUE>
+void T1_test();                   // Dummy Code to do some timing tests
 
 DRV8871 deltaprintr_motor(
     MOTOR_IN1,
     MOTOR_IN2
     );
 
-int _speed = 1000;          // Gets most torque
-int _acceleration = 0;      // No Acceleration Delay
-int _brake = 0;             // STOP IMMEDIATE
-int _debug_module = 0;      // P<MODEULE> where P=G/M Code
-int _debug_level = 0;       // S<LEVEL> where 0=OFF, 1=ON
-int _limitClosed = HIGH;    // Using ISR to set Limit instead of a digitalread
-int _limitOpen = HIGH;      // Using ISR to set Limit instead of a digitalread
-int _estop = HIGH;          // E-STOP PIN
-unsigned long _timeout = 2000;        // sdefault timeout value of 2 seconds
+int _speed = 254;                       // Gets most torque
+int _acceleration = 0;                  // No Acceleration Delay
+int _brake = 0;                         // STOP IMMEDIATE
+int _debug_module = 0;                  // P<MODEULE> where P=G/M Code
+int _debug_level = 0;                   // S<LEVEL> where 0=OFF, 1=ON
+int _limitClosed = HIGH;                // Using ISR to set Limit instead of a digitalread
+int _limitOpen = HIGH;                  // Using ISR to set Limit instead of a digitalread
+int _estop = HIGH;                      // E-STOP PIN
+unsigned long _timeout = 2000;          // sdefault timeout value of 2 seconds
 
-#define NumberOfCommands 10
+#define NumberOfCommands 11
 
 commandscallback commands[NumberOfCommands] = {
     {"G4", G4_pause},                  // G4 P<VALUE>  IGNORED
+    {"T1", T1_test},                   // T1 
     {"M111", M111_debug},              // M111 
     {"M112", M112_estop},              // M112
     {"M114", M114_reportPostion},      // M114
@@ -87,8 +136,10 @@ commandscallback commands[NumberOfCommands] = {
     {"M805", M805_closeNozzlemagazine}// M805 S<PERCENT> A<MILLISECONDS> B<VALUE>
 };
 
+gcode GCode(NumberOfCommands, commands);
+
+#endif 
+
 // SAMPLE INIT STRING
 // GET FIRNWARE INFO, SET SPEED/ACCEL/BREAK, Check Position and Make sure closed
 // M115 M220 S1000 A0 B0 M114 M805
-
-gcode GCode(NumberOfCommands, commands);

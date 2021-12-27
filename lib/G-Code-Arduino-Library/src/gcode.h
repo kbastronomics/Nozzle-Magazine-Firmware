@@ -1,4 +1,3 @@
-
 #ifndef gcode_h
 #define gcode_h
 
@@ -16,15 +15,12 @@
     #define gcode_Buffer_size 10
 #endif 
 
-
 typedef void (*CallbackFunction) ();
 
 typedef struct commandscallback {
     String value;
     CallbackFunction Callback;
 };
-
-
 
 class gcode
 {

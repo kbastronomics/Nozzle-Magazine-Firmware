@@ -1,16 +1,22 @@
 /**************************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 0.6.0b
+ * Deltaprinter Nozzle Magazine Driver - version 0.7.0b
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
  *
  * This Library is licensed under a GPLv3 License
  **************************************************************************************************/
 
+// Uncomment to use these features
+//#define __USE_INTERRUPTS__      // Use IRQ instead of Digitalreads
+//#define __USE_ESTOP_SWITCH__    // Add a ESTOP switch 
+//#define __USE_INA219__          // add current monitoring
+//#define __USE_EEPROM__          // Add EEPROM to store settings
+
 #include "nzholder.h"
 
+#ifdef __USE_INTERRUPTS__
 //
 // ISR Routines for Limit Switches/E-STOP
 //
-
 void isr_limitOpen() {
   // Toggle Variable instead of a Digital Read
   _limitOpen = !_limitOpen;
@@ -25,7 +31,7 @@ void isr_estop() {
   // Toggle Variable instead of a Digital Read
   _estop = !_estop;
 } 
-
+#endif
 //
 // END ISR Routines for Limit Switches/E-STOP.
 //
@@ -34,8 +40,28 @@ void isr_estop() {
 // BEGIN Support Functions
 //
 
+#ifdef __USE_INA219__
 //
-// checkASB:   Checks for the A|B|S PARMS and stores the results
+// read_ina219:
+//
+void read_ina219() {
+  // Read voltage and current from INA219.
+
+
+  shuntvoltage = ina219.getShuntVoltage_mV();
+  busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  // Compute load voltage, power, and milliamp-hours.
+  loadvoltage = busvoltage + (shuntvoltage / 1000);
+  power_mW = loadvoltage * current_mA;
+  total_mA += current_mA;
+  total_sec += 1;
+  total_mAH = total_mA / 3600.0;
+}
+#endif 
+
+//
+// checkParms:   Checks for the A|B|S PARMS and stores the results
 //
 int checkParms() {
   int nSpeedtmp=_speed;
@@ -101,8 +127,6 @@ int checkParms() {
 // END Support Functions
 //
 
-
-
 //
 // BEGIN callback functions,   all implemented as blocking calls
 //
@@ -127,6 +151,29 @@ void G4_pause() {
 
   delay(delayvaule);
   Serial.println("!OK");
+}
+
+//
+// T1_test:  Various timming tests
+//
+void T1_test() {
+unsigned long t1 = 0,t2 = 0,t3 = 0;
+int read = 0;
+
+
+Serial.println(">T1");
+
+t1 = micros();  // get start micros
+// function to test goes here
+read = digitalRead(LIMIT_CLOSE);
+t2 = micros();  // get end micros
+t3 = (t2 - t1) - 2;  // micros() takes about 2uS to execute so subtract it
+
+// print results
+Serial.print(";digitalRead() time (t3=t2-t1): ");
+Serial.print(t3);
+Serial.println(" uS");
+Serial.println("!OK");
 }
 
 //
@@ -185,13 +232,13 @@ void M114_reportPostion() {
   }
 
   if (digitalRead(LIMIT_OPEN) == HIGH && digitalRead(LIMIT_CLOSE) == HIGH ) {
-    state = "JAMMED"; 
+    state = "Magazine Slide Caught between Open/Close"; 
   }
 
   //Serial.print("N:");
   Serial.println(state);
   // Send final OK message
-  if( state == "JAMMED") {
+  if( state == "Magazine Slide Caught between Open/Close") {
     Serial.println("!ERROR");
   } else {
     Serial.println("!OK");
@@ -293,7 +340,14 @@ void M303_autotune() {
 
   // INSERT AUTOTUNING HERE
   for( int i=0; i <= count; i++ ) {
-   GCode.comment('C',(double)count);
+    #ifdef __USE_ESTOP_SWITCH__
+    if (digitalRead(ESTOP_SWITCH) == LOW) {
+      deltaprintr_motor.brakedown(0,0); 
+      Serial.println(";Emergincy Stop Triggered");
+      Serial.println("!OK");
+    }
+    #endif
+    GCode.comment('C',(double)count);
   }
 
   Serial.println("!OK");
@@ -369,6 +423,13 @@ void M804_openNozzlemagazine() {
       }
       while( digitalRead(LIMIT_OPEN) == HIGH )  { 
         time2 = millis();
+        #ifdef __USE_ESTOP_SWITCH__
+        if (digitalRead(ESTOP_SWITCH) == LOW) {
+          deltaprintr_motor.brakedown(0,0); 
+          Serial.println(";Emergincy Stop Triggered");
+          Serial.println("!OK");
+        }
+        #endif
         // timetmp = time2-time1;
         if( (time2-time1) >= _timeout ) {
           Serial.println(";Timed out opening Nozzle");
@@ -461,6 +522,13 @@ void M805_closeNozzlemagazine() {
       while( digitalRead(LIMIT_CLOSE) == HIGH )  { 
         time2 = millis();
         // timetmp = time2-time1;
+        #ifdef __USE_ESTOP_SWITCH__
+        if (digitalRead(ESTOP_SWITCH) == LOW) {
+          deltaprintr_motor.brakedown(0,0); 
+          Serial.println(";Emergincy Stop Triggered");
+          Serial.println("!OK");
+        }
+        #endif
         if( (time2-time1) >= _timeout ) {
           Serial.println(";Timed out opening Nozzle");
           Serial.println("!ERROR");
@@ -488,11 +556,15 @@ void M805_closeNozzlemagazine() {
 
 
 void setup() { 
-  GCode.begin(115200, ">"); //responce => ok, rs or !!
+  //GCode.begin(115200, ">"); //responce => ok, rs or !!
+  GCode.begin(115200,">"); //responce => ok, rs or !!
   pinMode(LEDpin, OUTPUT);
   pinMode(LIMIT_CLOSE,INPUT_PULLUP);
   pinMode(LIMIT_OPEN,INPUT_PULLUP);
-  pinMode(ESTOP,INPUT_PULLUP);
+
+#ifdef __USE_ESTOP_SWITCH__
+  pinMode(ESTOP_SWITCH,INPUT_PULLUP);
+#endif 
 
 #ifdef __USE_INTERRUPTS__
   noInterrupts();
@@ -506,10 +578,26 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ESTOP), isr_estop, CHANGE);
   interrupts();
 #endif
+
+#ifdef __USE_INA219_
+  if (! ina219.begin()) {
+    Serial.println("Failed to find INA219 chip");
+    while (1) { delay(10); }
+  }
+#endif
+  
 }
 
 void loop() {
 
   GCode.available();
+
+  #ifdef __USE_ESTOP_SWITCH__
+  if (digitalRead(ESTOP_SWITCH) == LOW) {
+    deltaprintr_motor.brakedown(0,0); 
+    Serial.println(";Emergincy Stop Triggered");
+    Serial.println("!OK");
+  }
+  #endif
 
 }
