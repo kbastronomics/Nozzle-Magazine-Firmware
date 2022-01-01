@@ -1,0 +1,96 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "D:/GitHub/nzmag/include",
+                "D:/GitHub/nzmag/src",
+                "D:/GitHub/nzmag/lib/G-Code-Arduino-Library/src",
+                "D:/GitHub/nzmag/lib/arduino_adafruit-drv8871/src",
+                "D:/GitHub/nzmag/.pio/libdeps/adafruit_metro_m0/Board Identify/src",
+                "C:/Users/smgvb/.platformio/packages/framework-cmsis/CMSIS/Core/Include",
+                "C:/Users/smgvb/.platformio/packages/framework-cmsis-atmel/CMSIS/Device/ATMEL",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/cores/arduino",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src/arduino",
+                "C:/Users/smgvb/.platformio/packages/framework-cmsis/CMSIS/DSP/Include",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/variants/metro_m0",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA/utility",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/CI_Tests",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/HID",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/I2S/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SAMD_AnalogCorrection/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SDU/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SPI",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Servo/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/USBHost/src",
+                "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Wire",
+                "C:/Users/smgvb/.platformio/packages/tool-unity",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "D:/GitHub/nzmag/include",
+                    "D:/GitHub/nzmag/src",
+                    "D:/GitHub/nzmag/lib/G-Code-Arduino-Library/src",
+                    "D:/GitHub/nzmag/lib/arduino_adafruit-drv8871/src",
+                    "D:/GitHub/nzmag/.pio/libdeps/adafruit_metro_m0/Board Identify/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-cmsis/CMSIS/Core/Include",
+                    "C:/Users/smgvb/.platformio/packages/framework-cmsis-atmel/CMSIS/Device/ATMEL",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/cores/arduino",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src/arduino",
+                    "C:/Users/smgvb/.platformio/packages/framework-cmsis/CMSIS/DSP/Include",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/variants/metro_m0",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA/utility",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/CI_Tests",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/HID",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/I2S/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SAMD_AnalogCorrection/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SDU/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/SPI",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Servo/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/USBHost/src",
+                    "C:/Users/smgvb/.platformio/packages/framework-arduino-samd-adafruit/libraries/Wire",
+                    "C:/Users/smgvb/.platformio/packages/tool-unity",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=50203",
+                "ARDUINO_SAMD_ZERO",
+                "ADAFRUIT_METRO_M0_EXPRESS",
+                "ARM_MATH_CM0PLUS",
+                "__SAMD21G18A__",
+                "ARDUINO=10805",
+                "F_CPU=48000000L",
+                "USBCON",
+                "USB_VID=0x239A",
+                "USB_PID=0x8013",
+                "USB_PRODUCT=\"Metro M0 Expres\"",
+                "USB_MANUFACTURER=\"Adafruit\"",
+                "ARDUINO_ARCH_SAMD",
+                "USB_CONFIG_POWER=100",
+                "ARDUINO_SAMD_ADAFRUIT",
+                ""
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "compilerPath": "C:/Users/smgvb/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc.exe",
+            "compilerArgs": [
+                "-mcpu=cortex-m0plus",
+                "-mthumb",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,34 @@
+#######################################
+# BOARD IFENTIFY
+# Syntax Coloring Map
+#######################################
+
+#######################################
+# Datatypes (DATA_TYPE)
+#######################################
+# 3 tabs required to make it bold?
+
+#######################################
+# Classes & Namespaces (KEYWORD1)
+#######################################
+
+BoardIdentify	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+type	KEYWORD2
+make	KEYWORD2
+model	KEYWORD2
+mcu	KEYWORD2
+
+#######################################
+# Instances (KEYWORD3)
+#######################################
+
+######################################
+# Constants (LITERAL1)
+#######################################
+
+BOARD_IDENTIFY_WARNING	LITERAL1
