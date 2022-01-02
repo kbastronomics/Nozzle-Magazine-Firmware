@@ -44,11 +44,11 @@ void DRV8871::drive(byte targetSpeed, byte direction, int acceleration)
   //check if spped is 0, if yes direction is set to neutral
   if (_currentSpeed == 0)
   {
-    _currentDirection = DIRECTION_NONE;
+    _currentDirection == DIRECTION_NONE;
   }
 }
 
-void DRV8871::brakedown(byte targetSpeed, int acceleration)
+void DRV8871::breakdown(byte targetSpeed, int acceleration)
 {
   if (_currentDirection == DIRECTION_FORWARD)
   {
@@ -64,7 +64,7 @@ void DRV8871::rampUpForward(byte targetSpeed, int acceleration)
 {
   _currentDirection = DIRECTION_FORWARD;
   digitalWrite(_motorIN1Pin, LOW);
-  for (int i=_currentSpeed; i<=targetSpeed; i++) // SEC
+  for (int i=_currentSpeed; i<targetSpeed; i++)
   {
     analogWrite(_motorIN2Pin, i);
     _currentSpeed = i;
@@ -88,7 +88,7 @@ void DRV8871::rampUpBackward(byte targetSpeed, int acceleration)
 {
    _currentDirection = DIRECTION_BACKWARD;
   digitalWrite(_motorIN2Pin, LOW);
-  for (int i=_currentSpeed; i<=targetSpeed; i++)  // SEC
+  for (int i=_currentSpeed; i<targetSpeed; i++)
   {
     analogWrite(_motorIN1Pin, i);
     _currentSpeed = i;
@@ -106,18 +106,6 @@ void DRV8871::rampDownBackward(byte targetSpeed, int acceleration)
     _currentSpeed = i;
     delay(acceleration);
   }
-}
-
-void DRV8871::coast ()
-{
-  digitalWrite(_motorIN1Pin, LOW);
-  digitalWrite(_motorIN2Pin, LOW);
-}
-
-void DRV8871::brake ()
-{
-  digitalWrite(_motorIN1Pin, HIGH);
-  digitalWrite(_motorIN2Pin, HIGH);
 }
 
 byte DRV8871::currentSpeed ()

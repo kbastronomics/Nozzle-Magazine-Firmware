@@ -1,12 +1,6 @@
-<<<<<<< Updated upstream
 /**************************************************************************************************
  * Deltaprinter Nozzle Magazine Driver - version 0.8.0B
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
-=======
-/**********************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 1.0
- * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/nzmag
->>>>>>> Stashed changes
  *
  * This Library is licensed under a GPLv3 License
  **************************************************************************************************/
@@ -21,21 +15,25 @@
 
 // To add current monitoring uncomment the #define __USE_INA219__ in the main file
 #ifdef __ENABLE_INA219__
-#include <Adafruit_INA219.h>
+    #include <Wire.h>
+    #include <INA219_WE.h> // https://github.com/wollewald/INA219_WE
+    #define I2C_ADDRESS 0x40
 
-float total_mA;
-unsigned long total_sec;
-float shuntvoltage;
-float busvoltage;
-float current_mA;
-float loadvoltage;
-float power_mW;
-float total_mAH;
-float peekCurrent_mA;
+    void read_ina219(); // declare the function since its now being used
 
-Adafruit_INA219 ina219;
+    INA219_WE ina219 = INA219_WE(I2C_ADDRESS);
 
-void read_ina219();
+    // define some global variables.   Maybe move into a structure instead???
+    float total_mA;
+    unsigned long total_sec;
+    float shuntvoltage;
+    float busvoltage;
+    float current_mA;
+    float loadvoltage;
+    float power_mW;
+    float total_mAH;
+    float peekCurrent_mA;
+    bool ina219_overflow = false;
 #endif
 
 // TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
@@ -47,11 +45,17 @@ void read_ina219();
 #define FIRMWARE_NAME       "Nozzle Magazine"
 #define GITHUB_URL          "https://github.com/kbastronomics/Nozzle-Magazine-Firmware"
 #define FIRMWARE_VERSION    "0.8.0B"
-#define MACHINE_TYPE        "Deltaprintr Nozzle Magazine (large)"
-#define NOZZLE_COUNT        20
+#ifdef __LARGE_NOZZLE__
+    #define MACHINE_TYPE        "Deltaprintr Nozzle Magazine (Large)"
+    #define NOZZLE_COUNT        20
+#endif
+#ifdef __SMALL_NOZZLE__
+    #define MACHINE_TYPE        "Deltaprintr Nozzle Magazine (Small)"
+    #define NOZZLE_COUNT        10
+#endif
+#define CONTROL_BOARD       "ADAFRUIT_METRO_M0_EXPRESS"
 #define MOTOR_DRIVER        "DRV8871"
 #define CURRENT_MONITOR     "INA219"
-#define CONTROL_BOARD       "ADAFRUIT_METRO_M0_EXPRESS"
 #define UUID                "6fc71526-82e3-4c48-b30d-5c81313cd1fd"
 #define ACTIVITYLED         LED_BUILTIN
 
@@ -118,8 +122,8 @@ int _acceleration = 0; // No Acceleration Delay
 int _brake = 0; // STOP IMMEDIATE
 int _debug_module = 0; // P<MODEULE> where P=G/M Code
 int _debug_level = 0; // S<LEVEL> where 0=OFF, 1=ON
-int _limitClosed = HIGH; // Using ISR to set Limit instead of a digitalread
-int _limitOpen = HIGH; // Using ISR to set Limit instead of a digitalread
+// int _limitClosed = HIGH; // Using ISR to set Limit instead of a digitalread
+// int _limitOpen = HIGH; // Using ISR to set Limit instead of a digitalread
 int _estop = HIGH; // E-STOP PIN
 unsigned long _timeout = 2000; // sdefault timeout value of 2 seconds
 
@@ -174,12 +178,17 @@ commandscallback commands[NumberOfCommands] = {
 
 gcode GCode(NumberOfCommands, commands);
 
-Bounce2::Button open_button = Bounce2::Button();
-Bounce2::Button close_button = Bounce2::Button();
+// Create open/close buttons
+Bounce2::Button open_switch = Bounce2::Button();
+Bounce2::Button close_switch = Bounce2::Button();
+
+// create open/close limit switches
+// Bounce2::Button limit_open = Bounce2::Button();
+// Bounce2::Button limit_close = Bounce2::Button();
 
 // TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
 #ifdef __ENABLE_ESTOP_SWITCH__
-Bounce2::Button estop_button = Bounce2::Button();
+    Bounce2::Button estop_switch = Bounce2::Button();
 #endif
 
 #endif
