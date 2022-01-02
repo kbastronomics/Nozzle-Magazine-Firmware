@@ -1,5 +1,5 @@
 /**************************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 0.8.0B
+ * Deltaprinter Nozzle Magazine Driver - version 1.0.0
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
  *
  * This Library is licensed under a GPLv3 License
@@ -16,7 +16,8 @@
 // To add current monitoring uncomment the #define __USE_INA219__ in the main file
 #ifdef __ENABLE_INA219__
     #include <Wire.h>
-    #include <INA219_WE.h> // https://github.com/wollewald/INA219_WE
+    #include <INA219_WE.h>  // https://github.com/wollewald/INA219_WE
+                            // https://learn.adafruit.com/adafruit-metro-m0-express/pinouts
     #define I2C_ADDRESS 0x40
 
     void read_ina219(); // declare the function since its now being used
@@ -44,7 +45,7 @@
 // FIRMWARE INFORMAITON
 #define FIRMWARE_NAME       "Nozzle Magazine"
 #define GITHUB_URL          "https://github.com/kbastronomics/Nozzle-Magazine-Firmware"
-#define FIRMWARE_VERSION    "0.8.0B"
+#define FIRMWARE_VERSION    "1.0.0"
 #ifdef __LARGE_NOZZLE__
     #define MACHINE_TYPE        "Deltaprintr Nozzle Magazine (Large)"
     #define NOZZLE_COUNT        20
@@ -57,6 +58,7 @@
 #define MOTOR_DRIVER        "DRV8871"
 #define CURRENT_MONITOR     "INA219"
 #define UUID                "6fc71526-82e3-4c48-b30d-5c81313cd1fd"
+#define NUMBER_MAGAZINES    1
 #define ACTIVITYLED         LED_BUILTIN
 
 //pin configuration for Adafruit Metro Express
@@ -84,16 +86,15 @@
 
 //pin configuration for the KBAstronomic Nozzle Magazine Control Board
 #ifdef KBASTRO_NOZZLE_MAGAZINE
-#define MOTOR_IN1           4
-#define MOTOR_IN2           5
-#define LIMIT_CLOSE         2
-#define LIMIT_OPEN          3
-#define CURRENT_SENSE       6
+#define MOTOR_IN1           9
+#define MOTOR_IN2           10
+#define LIMIT_CLOSE         11
+#define LIMIT_OPEN          12
 #ifdef __ENABLE_ESTOP_SWITCH__
-    #define ESTOP_SWITCH        0
+    #define ESTOP_SWITCH        7
 #endif
-#define OPEN_BUTTON         7
-#define CLOSE_BUTTON        8
+#define OPEN_BUTTON         2
+#define CLOSE_BUTTON        3
 #endif
 
 // declarations

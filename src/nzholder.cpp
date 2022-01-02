@@ -1,5 +1,5 @@
 /**************************************************************************************************
- * Deltaprinter Nozzle Magazine Driver - version 0.8.0B
+ * Deltaprinter Nozzle Magazine Driver - version 1.0.0
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
  *
  * This firmware is licensed under a GPLv3 License
@@ -31,14 +31,11 @@ void read_ina219() {
   power_mW = ina219.getBusPower();
   ina219_overflow = ina219.getOverflow();
 
-  if(ina219_overflow) {
-    Serial.println("Overflow! Choose higher PGAIN");
-  }
+  (ina219_overflow) ? Serial.println("Overflow! Choose higher PGAIN") :
 
   // record the peek current used will be reset after a M114 is issued
-  if (current_mA > peekCurrent_mA)
-    peekCurrent_mA = current_mA;
-
+  (current_mA > peekCurrent_mA) ? peekCurrent_mA = current_mA :
+ 
   // Compute load voltage, power, and milliamp-hours.
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   total_mA += current_mA;
@@ -46,7 +43,7 @@ void read_ina219() {
   total_mAH = total_mA / 3600.0;  
 
   // if we have the ISA219 in use we'll report current stats
-  Serial.print(";sv: ");
+  Serial.print("sv: "); 
   Serial.print(shuntvoltage);
   Serial.print(" bv: ");
   Serial.print(busvoltage);
@@ -58,13 +55,8 @@ void read_ina219() {
   Serial.print(loadvoltage);
   Serial.print(" pmW: ");
   Serial.print(power_mW);
-  // Serial.print(" tmA: ");
-  // Serial.print(total_mA);
-  // Serial.print(" tsec: ");
-  // Serial.print(total_sec);
   Serial.print(" tmAH: ");
   Serial.println(total_mAH);
-  // peekCurrent_mA = 0;
 }
 #endif
 
@@ -127,8 +119,6 @@ int checkParms() {
     }
     rc = 2;
   }
-
-  // Serial.println("!ok");
   return rc;
 }
 //
@@ -198,14 +188,10 @@ void M111_debug() {
   Serial.println(">M111");
 
   // if [P<VALUE<] this is in milliseconds so use as-is
-  if (GCode.availableValue('P')) {
-    _debug_module = (int) GCode.GetValue('P');
-  }
+  _debug_module = (int) (GCode.availableValue('P')) ?  GCode.GetValue('P') : 0 ;
 
   // if [L<VALUE<] this is debug level (L0=OFF, L1=MODULE ONLY, L2=ALL) 
-  if (GCode.availableValue('L')) {
-    _debug_level = (int) GCode.GetValue('L');
-  }
+  _debug_level = (int) (GCode.availableValue('L')) ? GCode.GetValue('L') : 0 ;
 
   Serial.print(";Debug p");
   Serial.print(_debug_module);
@@ -242,8 +228,9 @@ void M114_reportPostion() {
   if (digitalRead(LIMIT_OPEN) == LOW) {
     state = "open";
   }
+
   if (digitalRead(LIMIT_CLOSE) == LOW) {
-    state = "closed";
+    state = "close";
   }
 
   // if both limits are open we're stuck between them, allrt user
@@ -313,12 +300,8 @@ void M119_endStopState() {
     Serial.println("!error");
     return;
   }
-  if (digitalRead(LIMIT_OPEN) == LOW) {
-    n_max = "triggered";
-  }
-  if (digitalRead(LIMIT_CLOSE) == LOW) {
-    n_min = "triggered";
-  }
+  n_max = (digitalRead(LIMIT_OPEN) == LOW) ? "triggered" : "open" ;
+  n_min = (digitalRead(LIMIT_CLOSE) == LOW) ? "triggered" : "open" ;
 
   Serial.println(";Reporting Endstop State");
   Serial.print("n_min:");
@@ -336,7 +319,7 @@ void M119_endStopState() {
 //
 void M220_setFeedrate() {
 
-  digitalWrite(ACTIVITYLED, HIGH);
+  digitalWrite(ACTIVITYLED, HIGH); 
 
   if (checkParms() == 1) { // ERROR So do nothing
     return;
@@ -515,7 +498,9 @@ void M804_openNozzleMagazine() {
 
       }
       // now let user know we're open and things are OK.
-      peekCurrent_mA = 0;
+      #ifdef __ENABLE_INA219__
+        peekCurrent_mA = 0;
+      #endif
       Serial.println("n:open");
       Serial.println("!ok");
       digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
@@ -620,7 +605,9 @@ void M804_openNozzleMagazine() {
       }
 
       // now let user know we're open and things are OK.
-      peekCurrent_mA = 0;
+      #ifdef __ENABLE_INA219__
+        peekCurrent_mA = 0;
+      #endif 
       Serial.println("n:closed");
       Serial.println("!ok");
       digitalWrite(ACTIVITYLED, LOW);
@@ -670,7 +657,9 @@ void openNozzleMagazine() {
       deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
     }
       // now let user know we're open and things are OK.
-      peekCurrent_mA = 0;
+      #ifdef __ENABLE_INA219__      
+        peekCurrent_mA = 0;
+      #endif 
       Serial.println("n:open");
       Serial.println("!ok");
       digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
@@ -716,7 +705,9 @@ void closeNozzleMagazine() {
       deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
     }
       // Now let user know we're open and things are OK.
-      peekCurrent_mA = 0;
+      #ifdef __ENABLE_INA219__
+        peekCurrent_mA = 0;
+      #endif
       Serial.println("n:closed");
       Serial.println("!ok");
       digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
