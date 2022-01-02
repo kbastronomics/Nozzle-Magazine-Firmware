@@ -1,0 +1,513 @@
+/**************************************************************************************************
+ * Deltaprinter Nozzle Magazine Driver - version 0.6.0b
+ * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
+ *
+ * This Library is licensed under a GPLv3 License
+ **************************************************************************************************/
+
+#include "nzholder.h"
+
+//
+// ISR Routines for Limit Switches/E-STOP
+//
+
+void isr_limitOpen() {
+  // Toggle Variable instead of a Digital Read
+  _limitOpen = !_limitOpen;
+}
+
+void isr_limitClose() {
+  // Toggle Variable instead of a Digital Read
+  _limitClosed = !_limitClosed;
+}
+
+void isr_estop() {
+  // Toggle Variable instead of a Digital Read
+  _estop = !_estop;
+} 
+
+void T1_test() {
+
+}
+
+//
+// END ISR Routines for Limit Switches/E-STOP.
+//
+
+//
+// BEGIN Support Functions
+//
+
+//
+// checkASB:   Checks for the A|B|S PARMS and stores the results
+//
+int checkASBT() {
+  int nSpeedtmp=_speed;
+  int nAccellerationtmp=_acceleration;
+  int nBreaktmp=_brake;
+  int _timeouttmp=_timeout;
+  int rc=0;
+
+// rc=0 no parms passed
+// rc=1 error in parms
+// rc=2 parm passed
+
+// if [S<percent>] is sent get the value and save it
+  if(GCode.availableValue('S'))   {
+    _speed = (int) GCode.GetValue('S');
+      if ( _speed < 30 || _speed > 1000 ) {
+        Serial.println(";Error: S Value out of range"); 
+        _speed=nSpeedtmp;
+        Serial.println("!ERROR");
+        return 1;
+      }
+    rc = 2;
+  }
+  // if [A<Milliseconds>] is sent get the value and save it
+  if(GCode.availableValue('A'))   {
+    _acceleration = (int) GCode.GetValue('A');
+      if (_acceleration < 0 || _acceleration > 1000 ) {
+        Serial.println(";Error: A Value out of range");
+        _acceleration = nAccellerationtmp;
+        Serial.println("!ERROR");
+        return 1;
+      }
+   rc = 3;
+  } 
+  // if [B<value>] is sent get the value and save it
+  if(GCode.availableValue('B'))   {
+    _brake = (int) GCode.GetValue('B');
+      if (_brake < 0 || _brake > 100 ) {
+        Serial.println(";Error: B Value out of range");
+        _brake = nBreaktmp;
+        Serial.println("!ERROR");
+        return 1;
+      }
+   rc = 4;
+  } 
+
+  // if [T<value>] is sent get the value and save it
+  if(GCode.availableValue('T'))   {
+    _timeout = (int) GCode.GetValue('T');
+      if (_timeout < 0 || _timeout > 10000 ) {
+        Serial.println(";Error: T Value out of range");
+        _timeout = _timeouttmp;
+        Serial.println("!ERROR");
+        return 1;
+      }
+   rc = 5;
+  }
+
+ Serial.println("!OK");
+ return rc;
+}
+//
+// END Support Functions
+//
+
+
+
+//
+// BEGIN callback functions,   all implemented as blocking calls
+//
+
+//
+// G4_pause:  Delays for value S in milliseconds 
+// Has no real effect due to blocking nature of calls
+//
+void G4_pause() {
+  int delayvaule=0;
+
+  Serial.println(">G4");
+  // if [S<VALUE<] this is in seconds so multiple by 1000 
+  if(GCode.availableValue('S'))   {
+    delayvaule = (int) GCode.GetValue('S') * 1000;
+  }
+
+  // if [P<VALUE<] this is in milliseconds so use as-is
+  if(GCode.availableValue('P'))   {
+    delayvaule = (int) GCode.GetValue('P');
+  }
+
+  delay(delayvaule);
+  Serial.println("!OK");
+}
+
+//
+// M111_debug:  Sets Debug Flags P<MODULE> S<LEVEL>
+//
+void M111_debug() {
+
+  digitalWrite(LEDpin, HIGH);
+  Serial.println(">M111");
+
+    // if [P<VALUE<] this is in milliseconds so use as-is
+  if(GCode.availableValue('P'))   {
+    _debug_module = (int) GCode.GetValue('P');
+  }
+
+  // if [S<VALUE<] this is in seconds so multiple by 1000 
+  if(GCode.availableValue('S'))   {
+    _debug_level = (int) GCode.GetValue('S');
+  }
+
+  Serial.print(";DEBUG P");
+  Serial.print(_debug_module);
+  Serial.print(" S");
+  Serial.println(_debug_level);
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M112_estop:  Cause an immediate stop to motion
+//
+void M112_estop() {
+
+  digitalWrite(LEDpin, HIGH);
+  Serial.println(">M112");
+  deltaprintr_motor.breakdown(0,0);
+  Serial.println("E-STOP");
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M114_reportPostion:  Reports current postion information
+//
+void M114_reportPostion() {
+  String state="";
+
+  digitalWrite(LEDpin, HIGH);
+  //  get current state of limit switch's
+  Serial.println(">M114");
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    state = "Open"; 
+  }
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+    state = "Closed"; 
+  }
+
+  if (digitalRead(LIMIT_OPEN) == HIGH && digitalRead(LIMIT_CLOSE) == HIGH ) {
+    state = "JAMMED"; 
+  }
+
+  //Serial.print("N:");
+  Serial.println(state);
+  // Send final OK message
+  if( state == "JAMMED") {
+    Serial.println("!ERROR");
+  } else {
+    Serial.println("!OK");
+  }
+
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M115_reportFirmware:   Reports firmware information
+//
+void M115_reportFirmware() {
+  char buffer[512];
+
+  digitalWrite(LEDpin, HIGH);
+  sprintf(buffer,"FIRMWARE_NAME:%s %s (Github) SOURCE_CODE_URL:%s PROTOCOL_VERSION:%s MACHINE_TYPE:%s NOZZLE_COUNT:%d CONTROL_BOARD:%s MOTOR_DRIVE:%s UUID %s",FIRMWARE_NAME, FIRMWARE_VERSION, GITHUB_URL,PROTOCOL_VERSION,MACHINE_TYPE,NOZZLE_COUNT,CONTROL_BOARD,MOTOR_DRIVER,UUID);
+  Serial.println(">M115");
+  Serial.println(buffer);
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M119_endStopState: report the current state of the endstops
+//
+void M119_endStopState() {
+  String n_min="OPEN", n_max="OPEN";
+
+  digitalWrite(LEDpin, HIGH);
+  Serial.println(">M119");
+  
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH ) {
+    Serial.println(";Magazine Slide Caught between Open/Close");
+    Serial.println("!ERROR");
+    return;
+  }
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    n_max = "TRIGGERED"; 
+  }
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+    n_min = "TRIGGERED"; 
+  }
+
+  Serial.println("Reporting Endstop State");
+  Serial.print("n_min:");
+  Serial.println(n_min);    // n_min is closed position
+  Serial.print("n_max:");
+  Serial.println(n_max);    // n_max is open position
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+  return;
+}
+
+
+//
+// M220_setFeedrate: Sets the Speed, Acceleration and Brake values 
+//
+void M220_setFeedrate() {
+
+  digitalWrite(LEDpin, HIGH);
+
+  if ( checkASBT() == 1) { // ERROR So do nothing
+    return;
+  }
+
+  // echo gcode sent
+  Serial.println(">M220");
+  Serial.print("S:");
+  Serial.print(_speed);
+  Serial.print(" A:");
+  Serial.print(_acceleration);
+  Serial.print(" B:");
+  Serial.print(_brake);
+  Serial.print(" T:");
+  Serial.println(_timeout);  
+
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M303_autotune: Perform autotune to find the best speed and acceleration values
+//
+void M303_autotune() {
+  int count = 5;    // default number of cycles to find the optiman speed/acceleration values
+  digitalWrite(LEDpin, HIGH);
+  Serial.println(">M303");
+  
+    // if [C<value>] is sent get the value and save it
+  if(GCode.availableValue('C'))   {
+    count = (int) GCode.GetValue('C');
+      if (count <= 0 || count > 1000 ) {
+        Serial.println("Error: C Value out of range");
+        count = 5;
+        Serial.println("!OK");
+        return;
+      }
+  } 
+
+  // INSERT AUTOTUNING HERE
+  for( int i=0; i <= count; i++ ) {
+   GCode.comment('C',(double)count);
+  }
+
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+
+//
+// M804_openNozzlemagazine:  Open the magazine or report open if already open
+//
+void M804_openNozzlemagazine() {
+  unsigned long time1=0,time2=0;
+
+  digitalWrite(LEDpin, HIGH); // signal that we are in the routine
+  Serial.println(">M804");     // echo the command
+
+  // If the LIMIT_OPEN is already set just exit since we already are opne
+  if (digitalRead(LIMIT_OPEN) == LOW ) { 
+    if ( (_debug_module == 804 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.println("DEBUG: digitalRead(LIMIT_OPEN) == LOW "); 
+      Serial.print("DEBUG: S:");
+      Serial.print(_speed);
+      Serial.print(" A:");
+      Serial.println(_acceleration);
+    } 
+    Serial.println("Open");
+    Serial.println("!OK");
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+  // If Magazine is caught between Open/CLose force it to open
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH ) {
+    if ( (_debug_module == 804 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.println("DEBUG: digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH"); 
+    }
+
+    Serial.println(";Magazine Slide Caught between Open/Close: Ignoring Limits and forcing opposite direction");
+    deltaprintr_motor.drive(_speed,deltaprintr_motor.DIRECTION_BACKWARD, _acceleration);
+    while( digitalRead(LIMIT_OPEN) == HIGH )  { }
+    // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0,0);               // Default is Hard Stop (should I allow this to be overridden???)
+    Serial.println("!OK");
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+    // Check for any passed parms and if get a rc=1 we had an invalid parm so exit.
+  if ( checkASBT() == 1 ) {
+    if ( (_debug_module == 804 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.println("DEBUG: checkASBT()"); 
+    }
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+  // start by checking if we're on the limit closed swtich (which we should be) and if so move to open
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+  // execute gcode command
+  time1 = millis();
+  deltaprintr_motor.drive(_speed, deltaprintr_motor.DIRECTION_FORWARD, _acceleration);
+    // If M111 is turned on for M804 then print some debug information
+    if ( (_debug_module == 804 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.print("DEBUG: S:");
+      Serial.print(deltaprintr_motor.currentSpeed());
+      Serial.print(" A:");
+      Serial.print(_acceleration);
+      Serial.print(" D:");
+      Serial.println(deltaprintr_motor.currentDirection());
+    }
+    // 
+    while( digitalRead(LIMIT_OPEN) == HIGH )  { 
+      time2 = millis();
+      //timetmp = time2-time1;
+      if( (time2-time1) >= _timeout ) {
+        Serial.println(";Timed out opening Nozzle");
+        Serial.println("!ERROR");
+        deltaprintr_motor.breakdown(0,0); 
+        return;
+      }
+    } // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0,0);             // Hard Stop the motor
+  }
+  time2 = millis(); // grab a current time in mS to time move
+  if ( (_debug_module == 804 && _debug_level == 1) || _debug_level == 2 )  {
+    Serial.print(";move took (mS): ");
+    Serial.println(time2-time1);
+  }
+   // now let user know we're open and things are OK.
+  Serial.println("Open");
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW); // turn LED off to show we're out of the routine
+}
+
+//
+// M805_closeNozzlemagazine: Close the magazine or report open if already closed
+//
+void M805_closeNozzlemagazine() {
+  unsigned long time1=0,time2=0;
+ 
+  digitalWrite(LEDpin, HIGH);
+  Serial.println(">M805");
+
+  // If Magazine is caught between Open/CLose force it to back open
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH ) {
+    if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+    Serial.println("DEBUG: digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH"); 
+    }
+    Serial.println(";Magazine Slide Caught between Open/Close: Ignoring Limits and forcing opposite direction");
+    deltaprintr_motor.drive(_speed,deltaprintr_motor.DIRECTION_FORWARD, _acceleration);
+    while( digitalRead(LIMIT_CLOSE) == HIGH )  { }
+    // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0,0);               // Default is Hard Stop (should I allow this to be overridden???)
+
+    Serial.println("!OK");
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+  // If the LIMIT_CLOSE is already set just so so and exit
+  if (digitalRead(LIMIT_CLOSE) == LOW ) { 
+    if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+    Serial.println("DEBUG: digitalRead(LIMIT_CLOSE) == LOW"); 
+    }
+    Serial.println("Closed");
+    Serial.println("!OK");
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+  // Check for any passed parms
+  if ( checkASBT() == 1 ) {
+    if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.println("DEBUG: checkASB()"); 
+    }
+    digitalWrite(LEDpin, LOW);
+    return;
+  }
+
+  // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
+  if (digitalRead(LIMIT_OPEN) == LOW ) {
+    if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+      Serial.println("DEBUG: digitalRead(LIMIT_OPEN) == LOW "); 
+      Serial.print("DEBUG: S:");
+      Serial.print(_speed);
+      Serial.print(" A:");
+      Serial.println(_acceleration);
+     } 
+    time1 = millis();
+    deltaprintr_motor.drive(_speed,deltaprintr_motor.DIRECTION_BACKWARD, _acceleration);
+      if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+        Serial.print("DEBUG: S:");
+        Serial.print(deltaprintr_motor.currentSpeed());
+        Serial.print(" A:");
+        Serial.print(_acceleration);
+        Serial.print(" D:");
+        Serial.println(deltaprintr_motor.currentDirection());
+      }
+      while( digitalRead(LIMIT_CLOSE) == HIGH )  { 
+        time2 = millis();
+        // timetmp = time2-time1;
+        if( (time2-time1) >= _timeout ) {
+          Serial.println(";Timed out opening Nozzle");
+          Serial.println("!ERROR");
+          deltaprintr_motor.breakdown(0,0); 
+          return;
+        }
+      } // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0,0);               // Default is Hard Stop (should I allow this to be overridden???)
+  }   
+
+  time2 = millis();
+  if ( (_debug_module == 805 && _debug_level == 1) || _debug_level == 2 )  {
+    Serial.print("DEBUG: Move took (mS): ");
+    Serial.println(time2-time1);
+  }
+  
+  // now let user know we're open and things are OK.
+  Serial.println("Closed");
+  Serial.println("!OK");
+  digitalWrite(LEDpin, LOW);
+}
+//
+// END callback functions,   all implemented as blocking calls
+//
+
+
+
+void setup() { 
+  GCode.begin(115200, ">"); //responce => ok, rs or !!
+  pinMode(LEDpin, OUTPUT);
+  pinMode(LIMIT_CLOSE,INPUT_PULLUP);
+  pinMode(LIMIT_OPEN,INPUT_PULLUP);
+  //pinMode(ESTOP,INPUT_PULLUP);
+
+#ifdef __USE_INTERRUPTS__
+  noInterrupts();
+  // Set the Limit's to equal the current value then in ISR simply toggle it
+  _limitOpen = digitalRead(LIMIT_OPEN);
+  _limitClosed = digitalRead(LIMIT_CLOSE);
+  _estop = digitalRead(ESTOP);
+
+  attachInterrupt(digitalPinToInterrupt(LIMIT_OPEN), isr_limitOpen, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(LIMIT_CLOSE), isr_limitClose, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ESTOP), isr_estop, CHANGE);
+  interrupts();
+#endif
+}
+
+void loop() {
+
+  GCode.available();
+
+}

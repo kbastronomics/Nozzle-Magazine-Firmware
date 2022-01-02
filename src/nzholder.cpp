@@ -8,9 +8,11 @@
 // Uncomment to use these features
 #define __LARGE_NOZZLE__              // Uncomment for large Nozzle Magazine
 //#define __SMALL_NOZZLE__            // Uncomment for small Nozzle Magazine
-#define __ENABLE_ESTOP_SWITCH__       // Add a ESTOP switch 
-#define __ENABLE_INA219__             // add current monitoring
-//#define __ENABLE_EEPROM__           // Add EEPROM to store settings
+#define __ENABLE_ESTOP_SWITCH__       // Add a Physical E-STOP switch to board 
+#define __ENABLE_OC_SWITCH__          // Add Physical Open/Close Switches on board
+#define __ENABLE_INA219__             // Add INA219 current monitoring on board
+//#define __ENABLE_EEPROM__           // Add 24C08 EEPROM to store settings board
+#define __ENABLE_TEST_CODE__          // Enable Timing test code (not for production)
 
 #include "nzholder.h"
 
@@ -151,6 +153,7 @@ void G4_pause() {
   Serial.println("!ok");
 }
 
+#ifdef __ENABLE_TEST_CODE__
 //
 // T1_test:  Various timming tests 
 //           This will be removed when development is completed
@@ -176,6 +179,7 @@ void T1_test() {
   Serial.println(" uS");
   Serial.println("!ok");
 }
+#endif 
 
 //
 // M111_debug:  Sets Debug Flags P<MODULE> L<LEVEL>
@@ -615,7 +619,7 @@ void M804_openNozzleMagazine() {
 //
 // END callback functions,   all implemented as blocking calls
 //
-
+#ifdef __ENABLE_ESTOP_SWITCH__
 //
 // openNozzle:  Manuualy open the Nozzle via push button on controller
 //
@@ -711,7 +715,8 @@ void closeNozzleMagazine() {
       Serial.println("n:closed");
       Serial.println("!ok");
       digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
-}             
+}         
+#endif     
 
 void setup() {
 
@@ -726,17 +731,19 @@ void setup() {
   pinMode(LIMIT_CLOSE, INPUT_PULLUP);
   pinMode(LIMIT_OPEN, INPUT_PULLUP);
 
-  // CREATE BUTTONS
-  open_switch.attach( OPEN_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
-  close_switch.attach( CLOSE_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+  #ifdef __ENABLE_OC_SWITCH__
+    // CREATE BUTTONS
+    open_switch.attach( OPEN_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+    close_switch.attach( CLOSE_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+    
+    // DEBOUNCE INTERVAL IN MILLISECONDS
+    open_switch.interval(5);
+    close_switch.interval(5); 
   
-  // DEBOUNCE INTERVAL IN MILLISECONDS
-  open_switch.interval(5);
-  close_switch.interval(5); 
- 
-  // INDICATE THAT THE LOW STATE CORRESPONDS TO PHYSICALLY PRESSING THE BUTTON
-  open_switch.setPressedState(LOW);
-  close_switch.setPressedState(LOW); 
+    // INDICATE THAT THE LOW STATE CORRESPONDS TO PHYSICALLY PRESSING THE BUTTON
+    open_switch.setPressedState(LOW);
+    close_switch.setPressedState(LOW); 
+  #endif 
  
   // If the ESTOP is defined create the button with a 5ms debounce and active low 
   #ifdef __ENABLE_ESTOP_SWITCH__
@@ -804,10 +811,6 @@ void loop() {
   // see if there is a GCODE command available
   GCode.available();
 
-  // get button info
-  open_switch.update();
-  close_switch.update();
-
   // if ESTOP is defined get button and if pressed stop motor
   #ifdef __ENABLE_ESTOP_SWITCH__
     estop_switch.update();
@@ -817,13 +820,19 @@ void loop() {
     }
   #endif
 
+  #ifdef __ENABLE_OC_SWITCH__
+  // get button info
+    open_switch.update();
+    close_switch.update();
+  
   // if the open button is pressed call openNozzleMagazine
-  if ( open_switch.pressed() ) {
-    openNozzleMagazine();
+    if ( open_switch.pressed() ) {
+      openNozzleMagazine();
   }
 
   // if the close button is pressed call closeNozzleMagazine
-  if (close_switch.pressed()) {
-    closeNozzleMagazine();
+    if (close_switch.pressed()) {
+      closeNozzleMagazine();
   }
+  #endif 
 }

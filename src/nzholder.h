@@ -109,9 +109,13 @@ void M220_setFeedrate();            // M220 S<VALUE> A<VALUE> D<VALUE>
 void M303_autotune();               // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
 void M804_openNozzleMagazine();     // M804 S<VALUE> A<VALUE> D<VALUE>
 void M805_closeNozzleMagazine();    // M805 S<VALUE> A<VALUE> D<VALUE>
-void T1_test(); // Dummy Code to do some timing tests
-void openNozzleMagazine(); // Manual override to open nozzle
-void closeNozzleMagazine(); // Manual override to close nozzle
+#ifdef __ENABLE_TEST_CODE__
+    void T1_test(); // Dummy Code to do some timing tests
+#endif 
+#ifdef __ENABLE_OC_SWITCH__
+    void openNozzleMagazine(); // Manual override to open nozzle
+    void closeNozzleMagazine(); // Manual override to close nozzle
+#endif 
 
 DRV8871 deltaprintr_motor(
   MOTOR_IN1,
@@ -123,22 +127,26 @@ int _acceleration = 0; // No Acceleration Delay
 int _brake = 0; // STOP IMMEDIATE
 int _debug_module = 0; // P<MODEULE> where P=G/M Code
 int _debug_level = 0; // S<LEVEL> where 0=OFF, 1=ON
-// int _limitClosed = HIGH; // Using ISR to set Limit instead of a digitalread
-// int _limitOpen = HIGH; // Using ISR to set Limit instead of a digitalread
 int _estop = HIGH; // E-STOP PIN
 unsigned long _timeout = 2000; // sdefault timeout value of 2 seconds
 
-#define NumberOfCommands 11
+#ifdef __ENABLE_TEST_CODE__
+    #define NumberOfCommands 11
+#else
+    #define NumberOfCommands 10
+#endif
 
 commandscallback commands[NumberOfCommands] = {
   {
     "G4",
     G4_pause
   }, // G4 P<VALUE>  IGNORED
+#ifdef __ENABLE_TEST_CODE__
   {
     "T1",
     T1_test
   }, // T1 
+#endif 
   {
     "M111",
     M111_debug
@@ -180,12 +188,10 @@ commandscallback commands[NumberOfCommands] = {
 gcode GCode(NumberOfCommands, commands);
 
 // Create open/close buttons
-Bounce2::Button open_switch = Bounce2::Button();
-Bounce2::Button close_switch = Bounce2::Button();
-
-// create open/close limit switches
-// Bounce2::Button limit_open = Bounce2::Button();
-// Bounce2::Button limit_close = Bounce2::Button();
+#ifdef __ENABLE_OC_SWITCH__
+    Bounce2::Button open_switch = Bounce2::Button();
+    Bounce2::Button close_switch = Bounce2::Button();
+#endif 
 
 // TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
 #ifdef __ENABLE_ESTOP_SWITCH__
