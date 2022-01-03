@@ -4,11 +4,12 @@
 Deltaprinr Nozzle Magazine Firmware for the [Deltaprintr Nozzle Magazine](https://www.deltaprintr.com/product/nozzle-magazine/)
 ![](https://23re3128oij2wuxh2nd3ndfi-wpengine.netdna-ssl.com/wp-content/uploads/2021/10/Nozzle_Magazine.png)
 
-Uses a ATSAMD21E18 + DRV8871 Motor Driver to control the Nozzle Magazine
+Uses a ATSAMD21 + DRV8871 Motor Driver to control the Nozzle Magazine
 
 ## Features:
 
 - Single Board design (see Nozzle Magazine Hardware)
+- Can be built using a Adafruit Trinket + DRV8871 + INA210 or any ATSAMD21 Board
 - Limit Switches Supported
 - JAM Recovery
 - Error Reporting
@@ -20,7 +21,7 @@ Uses a ATSAMD21E18 + DRV8871 Motor Driver to control the Nozzle Magazine
   - EEPROM Stores all settings to recall at startup time
   - NEOPIXEL for Status (Red/Green) and Blue for Communications
   - Configurable for Large(20) or Small(10) Nozzle Magazine    
-- Can be built using a Adafruit Trinket + DRV8871 + INA210
+
 
 ## GCODEs Supported 
 
