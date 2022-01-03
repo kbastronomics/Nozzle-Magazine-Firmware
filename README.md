@@ -1,10 +1,10 @@
 # Openpnp Nozzle Magazine Firmware
 
-Deltaprintr Nozzle Magazine Firmware for the Deltaprinr Nozzle Magazine 
+
+Deltaprinr Nozzle Magazine Firmware for the [Deltaprintr Nozzle Magazine](https://www.deltaprintr.com/product/nozzle-magazine/)
 ![](https://23re3128oij2wuxh2nd3ndfi-wpengine.netdna-ssl.com/wp-content/uploads/2021/10/Nozzle_Magazine.png)
 
-Uses a ATSAMD21E18 + 8871 Motor Driver to control the Nozzle Magazine
-Current sensing is to allow tuning for optimal speed
+Uses a ATSAMD21E18 + DRV8871 Motor Driver to control the Nozzle Magazine
 
 ## Features:
 
@@ -14,7 +14,7 @@ Current sensing is to allow tuning for optimal speed
 - Error Reporting
 - USB Micro Serial Port @ 115200 Baud
 - Optional Support for (at compile time)
-  - INA219 Highside Current Sense 
+  - INA219 Highside Current Sense (tune the magazine with **M111 L3**)
   - Open/Close Buttons
   - E-STOP Button
   - EEPROM Stores all settings to recall at startup time
