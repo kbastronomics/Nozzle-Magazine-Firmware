@@ -13,36 +13,7 @@
 #include <gcode.h>   // https://github.com/tinkersprojects/G-Code-Arduino-Library
 #include <Bounce2.h> // https://github.com/thomasfredericks/Bounce2
 
-// To add current monitoring uncomment the #define __USE_INA219__ in the main file
-#ifdef __ENABLE_INA219__
-    #include <Wire.h>
-    #include <INA219_WE.h>  // https://github.com/wollewald/INA219_WE
-                            // https://learn.adafruit.com/adafruit-metro-m0-express/pinouts
-    #define I2C_ADDRESS 0x40
-
-    void read_ina219(); // declare the function since its now being used
-
-    INA219_WE ina219 = INA219_WE(I2C_ADDRESS);
-
-    // define some global variables.   Maybe move into a structure instead???
-    float total_mA;
-    unsigned long total_sec;
-    float shuntvoltage;
-    float busvoltage;
-    float current_mA;
-    float loadvoltage;
-    float power_mW;
-    float total_mAH;
-    float peekCurrent_mA;
-    bool ina219_overflow = false;
-#endif
-
-// TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
-#ifdef __ENABLE_EEPROM__
-
-#endif
-
-// FIRMWARE INFORMAITON
+// FIRMWARE/CONTROLER  INFORMAITON
 #define FIRMWARE_NAME       "Nozzle Magazine"
 #define GITHUB_URL          "https://github.com/kbastronomics/Nozzle-Magazine-Firmware"
 #define FIRMWARE_VERSION    "1.0.0"
@@ -59,42 +30,57 @@
 #define CURRENT_MONITOR     "INA219"
 #define UUID                "6fc71526-82e3-4c48-b30d-5c81313cd1fd"
 #define NUMBER_MAGAZINES    1
-#define ACTIVITYLED         LED_BUILTIN
+
+// PIN_PA31D_SERCOM1_PAD3 (31L)
+// LED_BUILTIN PIN_LED_13  (13u)
+// PIN_NEOPIXEL NEOPIXEL_BUILTIN  (40u)
 
 //pin configuration for Adafruit Metro Express
 #ifdef ADAFRUIT_METRO_M0_EXPRESS
-#define MOTOR_IN1           9
-#define MOTOR_IN2           10
-#define LIMIT_CLOSE         11
-#define LIMIT_OPEN          12
-#ifdef __ENABLE_ESTOP_SWITCH__
-    #define ESTOP_SWITCH        7
-#endif
-#define OPEN_BUTTON         2
-#define CLOSE_BUTTON        3
+    #define MOTOR_IN1               9
+    #define MOTOR_IN2               10
+    #define LIMIT_CLOSE             11
+    #define LIMIT_OPEN              12
+    #ifdef __ENABLE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH        7
+    #endif
+    #define OPEN_BUTTON             2
+    #define CLOSE_BUTTON            3
+    #ifdef __ENABLE_NEOPIXEL__
+        #define NEOPIXEL_PIN        40
+    #endif 
+    #define ACTIVITYLED             LED_BUILTIN   // LED_BUILTIN PIN_LED_13  (13u)
 #endif
 
 //pin configuration for Adafruit Trinket M0
 #ifdef ADAFRUIT_TRINKET_M0
-#define MOTOR_IN1           4
-#define MOTOR_IN2           5
-#define LIMIT_CLOSE         2
-#ifdef __ENABLE_ESTOP_SWITCH__
-    #define ESTOP_SWITCH        0
-#endif
+    #define MOTOR_IN1               4
+    #define MOTOR_IN2               5
+    #define LIMIT_CLOSE             2
+    #ifdef __ENABLE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH        0
+    #endif
+    #define ACTIVITYLED             LED_BUILTIN
+    #ifdef __ENABLE_NEOPIXEL__
+        #define NEOPIXEL_PIN        NEOPIXEL_BUILTIN
+    #endif 
 #endif
 
 //pin configuration for the KBAstronomic Nozzle Magazine Control Board
 #ifdef KBASTRO_NOZZLE_MAGAZINE
-#define MOTOR_IN1           9
-#define MOTOR_IN2           10
-#define LIMIT_CLOSE         11
-#define LIMIT_OPEN          12
-#ifdef __ENABLE_ESTOP_SWITCH__
-    #define ESTOP_SWITCH        7
-#endif
-#define OPEN_BUTTON         2
-#define CLOSE_BUTTON        3
+    #define MOTOR_IN1               9
+    #define MOTOR_IN2               10
+    #define LIMIT_CLOSE             11
+    #define LIMIT_OPEN              12
+    #ifdef __ENABLE_ESTOP_SWITCH__
+        #define ESTOP_SWITCH        7
+    #endif
+    #define OPEN_BUTTON             2
+    #define CLOSE_BUTTON            3
+    #ifdef __ENABLE_NEOPIXEL__
+        #define NEOPIXEL_PIN        40
+    #endif 
+    #define ACTIVITYLED             LED_BUILTIN
 #endif
 
 // declarations
@@ -109,12 +95,10 @@ void M220_setFeedrate();            // M220 S<VALUE> A<VALUE> D<VALUE>
 void M303_autotune();               // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
 void M804_openNozzleMagazine();     // M804 S<VALUE> A<VALUE> D<VALUE>
 void M805_closeNozzleMagazine();    // M805 S<VALUE> A<VALUE> D<VALUE>
+
+
 #ifdef __ENABLE_TEST_CODE__
     void T1_test(); // Dummy Code to do some timing tests
-#endif 
-#ifdef __ENABLE_OC_SWITCH__
-    void openNozzleMagazine(); // Manual override to open nozzle
-    void closeNozzleMagazine(); // Manual override to close nozzle
 #endif 
 
 DRV8871 deltaprintr_motor(
@@ -127,8 +111,9 @@ int _acceleration = 0; // No Acceleration Delay
 int _brake = 0; // STOP IMMEDIATE
 int _debug_module = 0; // P<MODEULE> where P=G/M Code
 int _debug_level = 0; // S<LEVEL> where 0=OFF, 1=ON
-int _estop = HIGH; // E-STOP PIN
 unsigned long _timeout = 2000; // sdefault timeout value of 2 seconds
+static bool __estop__ = false;
+static bool __error__ = false; 
 
 #ifdef __ENABLE_TEST_CODE__
     #define NumberOfCommands 11
@@ -186,6 +171,99 @@ commandscallback commands[NumberOfCommands] = {
 };
 
 gcode GCode(NumberOfCommands, commands);
+
+
+// To add current monitoring uncomment the #define __USE_INA219__ in the main file
+#ifdef __ENABLE_INA219__
+    #include <Wire.h>
+    #include <INA219_WE.h>  // https://github.com/wollewald/INA219_WE
+                            // https://learn.adafruit.com/adafruit-metro-m0-express/pinouts
+    #define I2C_ADDRESS 0x40
+
+    void read_ina219(); // declare the function since its now being used
+
+    INA219_WE ina219 = INA219_WE(I2C_ADDRESS);
+
+    // define some global variables.   Maybe move into a structure instead???
+    float total_mA;
+    unsigned long total_sec;
+    float shuntvoltage;
+    float busvoltage;
+    float current_mA;
+    float loadvoltage;
+    float power_mW;
+    float total_mAH;
+    float peekCurrent_mA;
+    bool ina219_overflow = false;
+#endif
+
+// Add support files for the NEOPIXEL Status LED
+#ifdef __ENABLE_NEOPIXEL__
+    #include <Adafruit_NeoPixel.h>
+    void neopixel_led(uint8_t color);
+
+    #define NUMPIXELS       1
+
+    uint8_t rgb_values[3];
+    int _brightness = 128;  
+
+    #define NEOPIXEL_RED    1
+    #define NEOPIXEL_GREEN  2
+    #define NEOPIXEL_BLUE   3
+    #define NEOPIXEL_WHITE  4
+    #define NEOPIXEL_ON     _brightness
+    #define NEOPIXEL_OFF    0
+
+    Adafruit_NeoPixel strip(NUMPIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
+        
+    class Strip
+    {
+    public:
+      uint8_t   effect;
+      uint8_t   effects;
+      uint16_t  effStep;
+      unsigned long effStart;
+      Adafruit_NeoPixel strip;
+      Strip(uint16_t leds, uint8_t pin, uint8_t toteffects, uint16_t striptype) : strip(leds, pin, striptype) {
+        effect = -1;
+        effects = toteffects;
+        Reset();
+      }
+      void Reset(){
+        effStep = 0;
+        effect = (effect + 1) % effects;
+        effStart = millis();
+      }
+    };
+
+    struct Loop
+    {
+      uint8_t currentChild;
+      uint8_t childs;
+      bool timeBased;
+      uint16_t cycles;
+      uint16_t currentTime;
+      Loop(uint8_t totchilds, bool timebased, uint16_t tottime) {currentTime=0;currentChild=0;childs=totchilds;timeBased=timebased;cycles=tottime;}
+    };
+
+    Strip strip_0(1, NEOPIXEL_BUILTIN, 1, NEO_GRB + NEO_KHZ800);
+    struct Loop strip0loop0(1, false, 1);
+
+#endif
+
+// TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
+#ifdef __ENABLE_EEPROM__
+
+#endif
+
+#ifdef __ENABLE_OC_SWITCH__
+    //static bool oc_state = 0;    
+    #define __NUM_OC_BUTTONS__ 2 
+
+    void openNozzleMagazine(); // Manual override to open nozzle
+    void closeNozzleMagazine(); // Manual override to close nozzle
+#endif 
 
 // Create open/close buttons
 #ifdef __ENABLE_OC_SWITCH__
