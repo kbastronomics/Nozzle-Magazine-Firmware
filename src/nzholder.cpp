@@ -6,44 +6,68 @@
  **************************************************************************************************/
 
 // Uncomment to use these features
-#define __LARGE_NOZZLE__              // Uncomment for large Nozzle Magazine
-//#define __SMALL_NOZZLE__            // Uncomment for small Nozzle Magazine
+#define __LARGE_NOZZLE__              // Uncomment for large Nozzle Magazine (20)
+//#define __SMALL_NOZZLE__            // Uncomment for small Nozzle Magazine (10)
 #define __ENABLE_ESTOP_SWITCH__       // Add a Physical E-STOP switch to board 
 #define __ENABLE_OC_SWITCH__          // Add Physical Open/Close Switches on board
 #define __ENABLE_INA219__             // Add INA219 current monitoring on board
-#define __ENABLE_NEOPIXEL__           // Enables the NeoPixel instead of the BUILTIN LED (Provides Green/Red alerting)
-//#define __ENABLE_EEPROM__           // Add 24C08 EEPROM to store settings board
-//#define __ENABLE_TEST_CODE__        // Enable Timing test code (not for production)
+#define __ENABLE_NEOPIXEL__           // Enables the NeoPixel in addition to the BUILTIN LED for status
+                                      // Blue waiting, Green executing, Red Error, Pulsing Red ESTOP
+//#define __ENABLE_EEPROM__           // Add EEPROM to store settings board
 
 #include "nzholder.h"
 
-#ifdef __ENABLE_NEOPIXEL__
 //
 // BEGIN Support Functions
 //
-
+#ifdef __ENABLE_NEOPIXEL__
 //
 // Stripe effects from https://adrianotiger.github.io/Neopixel-Effect-Generator/
 //
+#define PULSE_SPEED 2000
+
 uint8_t strip0_loop0_eff0() {
     // Strip ID: 0 - Effect: Fade - LEDS: 1
     // Steps: 500 - Delay: 1
-    // Colors: 2 (0.0.0, 0.0.255)
+    // Colors: 2 (0.0.255, 0.0.50)
     // Options: duration=500, every=1, 
   if(millis() - strip_0.effStart < 1 * (strip_0.effStep)) return 0x00;
   uint8_t r,g,b;
   double e;
-  e = (strip_0.effStep * 1) / (double)800;
-  r = ( e ) * 255 + 0 * ( 1.0 - e );
-  g = ( e ) * 255 + 0 * ( 1.0 - e );
-  b = ( e ) * 255 + 0 * ( 1.0 - e );
+  e = (strip_0.effStep * 1) / (double)PULSE_SPEED;
+  ( __estop__ == true) ?  r = ( e ) * 10 + 255 * ( 1.0 - e ) : r = ( e ) * 0 + 0 * ( 1.0 - e ) ;
+  g = ( e ) * 0 + 0 * ( 1.0 - e );
+  ( __estop__ == false) ?  b = ( e ) * 10 + 255 * ( 1.0 - e ) : b = ( e ) * 0 + 0 * ( 1.0 - e ) ;
   for(uint16_t j=0;j<1;j++) {
     if((j % 1) == 0)
       strip_0.strip.setPixelColor(j, r, g, b);
     else
       strip_0.strip.setPixelColor(j, 0, 0, 0);
   }
-  if(strip_0.effStep >= 800) {strip_0.Reset(); return 0x03; }
+  if(strip_0.effStep >= PULSE_SPEED) {strip_0.Reset(); return 0x03; }
+  else strip_0.effStep++;
+  return 0x01;
+}
+
+uint8_t strip0_loop0_eff1() {
+    // Strip ID: 0 - Effect: Fade - LEDS: 1
+    // Steps: 500 - Delay: 1
+    // Colors: 2 (0.0.50, 0.0.255)
+    // Options: duration=500, every=1, 
+  if(millis() - strip_0.effStart < 1 * (strip_0.effStep)) return 0x00;
+  uint8_t r,g,b;
+  double e;
+  e = (strip_0.effStep * 1) / (double)PULSE_SPEED;
+  ( __estop__ == true) ?  r = ( e ) * 255 + 10 * ( 1.0 - e ) : r = ( e ) * 0 + 0 * ( 1.0 - e ) ;
+  g = ( e ) * 0 + 0 * ( 1.0 - e );
+  ( __estop__ == false) ?  b = ( e ) * 255 + 10 * ( 1.0 - e ) : b = ( e ) * 0 + 0 * ( 1.0 - e ) ;
+  for(uint16_t j=0;j<1;j++) {
+    if((j % 1) == 0)
+      strip_0.strip.setPixelColor(j, r, g, b);
+    else
+      strip_0.strip.setPixelColor(j, 0, 0, 0);
+  }
+  if(strip_0.effStep >= PULSE_SPEED) {strip_0.Reset(); return 0x03; }
   else strip_0.effStep++;
   return 0x01;
 }
@@ -53,6 +77,8 @@ uint8_t strip0_loop0() {
   switch(strip0loop0.currentChild) {
     case 0: 
            ret = strip0_loop0_eff0();break;
+    case 1: 
+           ret = strip0_loop0_eff1();break;
   }
   if(ret & 0x02) {
     ret &= 0xfd;
@@ -68,8 +94,10 @@ uint8_t strip0_loop0() {
 }
 
 void strips_loop() {
-  if(strip0_loop0() & 0x01)
+  if(strip0_loop0() & 0x01) {
+    strip_0.strip.setBrightness(__brightness__);
     strip_0.strip.show();
+  }
 }
 
 //
@@ -152,7 +180,7 @@ int checkParms() {
   int _nBreaktmp = _brake;
   int _timeouttmp = _timeout;
   #ifdef __ENABLE_NEOPIXEL__
-    int _brightnesstmp = _brightness;
+    int _brightnesstmp = __brightness__;
   #endif
   int rc = 0;
 
@@ -208,10 +236,10 @@ int checkParms() {
   #ifdef __ENABLE_NEOPIXEL__
   // if [D<value>] is sent get the value and save it
   if (GCode.availableValue('D')) {
-    _brightness = (int) GCode.GetValue('D');
-    if (_brightness < 0 || _brightness > 255) {
+    __brightness__ = (int) GCode.GetValue('D');
+    if (__brightness__ < 0 || __brightness__ > 255) {
       Serial.println(";Error: D Value out of range");
-      _brightness = _brightnesstmp;
+      __brightness__ = _brightnesstmp;
       Serial.println("!error");
       return 1;
     }
@@ -224,6 +252,7 @@ int checkParms() {
 //
 // END Support Functions
 //
+
 
 //
 // BEGIN callback functions,   all implemented as blocking calls
@@ -259,34 +288,6 @@ void G4_pause() {
   #endif
 }
 
-#ifdef __ENABLE_TEST_CODE__
-//
-// T1_test:  Various timming tests 
-//           This will be removed when development is completed
-//
-void T1_test() {
-  unsigned long t1 = 0, t2 = 0, t3 = 0;
-  int read = 0;
-
-  Serial.println(">T1");
-
-  t1 = micros(); // get start micros
-  
-  // begin function to test goes here
-  read = digitalRead(LIMIT_CLOSE);
-  // end function to test
-
-  t2 = micros(); // get end micros
-  t3 = (t2 - t1) - 2; // micros() takes about 2uS to execute so subtract it
-
-  // print results
-  Serial.print(";digitalRead() time (t3=t2-t1): ");
-  Serial.print(t3);
-  Serial.println(" uS");
-  Serial.println("!ok");
-}
-#endif 
-
 //
 // M111_debug:  Sets Debug Flags P<MODULE> L<LEVEL>
 // P[MODULE] is the numeric value of the call the be debuged,  ignored is L2
@@ -295,12 +296,13 @@ void T1_test() {
 void M111_debug() {
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
+
   Serial.println(">M111");
-  __estop__ = false;
-  // if [P<VALUE<] this is in milliseconds so use as-is
+
+  // if [P<VALUE>] this is the module #,  ie. M804 would be 804
   _debug_module = (int) (GCode.availableValue('P')) ?  GCode.GetValue('P') : 0 ;
 
   // if [L<VALUE<] this is debug level (L0=OFF, L1=MODULE ONLY, L2=ALL) 
@@ -323,7 +325,7 @@ void M111_debug() {
 void M112_estop() {
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
 
@@ -334,8 +336,12 @@ void M112_estop() {
     int value = (int) GCode.GetValue('P');
     if (value == 1 ) {
       __estop__ = false;
-      Serial.println(";E-STOP Cleared");
+      Serial.println("E-STOP Cleared");
       Serial.println("!ok");
+      #ifdef __ENABLE_NEOPIXEL__
+        neopixel_led(NEOPIXEL_BLUE, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+      digitalWrite(ACTIVITYLED, LOW);
       return;
     }
   }
@@ -345,7 +351,7 @@ void M112_estop() {
   Serial.println("!ok");
   __estop__ = true;
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS RED DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, LOW);
 }
@@ -357,8 +363,6 @@ void M114_reportPostion() {
   String state = "";
   int istate = 0;
 
-  __estop__ = false;
-  __error__ = false;
   #ifdef __ENABLE_NEOPIXEL__
     neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
@@ -394,13 +398,22 @@ void M114_reportPostion() {
   }
   #endif
 
+  if ( _debug_level == 5) { // print vars
+    Serial.print(";error:");
+    Serial.print(__error__);
+    Serial.print(" estop:");
+    Serial.print(__estop__);
+    Serial.print(" sleep:");
+    Serial.println(__sleeping__);
+  }
+  
   // Send final message
   Serial.print("p:");
   Serial.println(state);
   (istate > 0) ? Serial.println("!error") : Serial.println("!ok");
 
   #ifdef __ENABLE_NEOPIXEL__
-    (__error__ = false) ? neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF) : neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON) ; 
+    ( __error__ == false) ? neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF) : neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON) ; 
   #endif
   digitalWrite(ACTIVITYLED, LOW);
 }
@@ -417,8 +430,6 @@ void M115_reportFirmware() {
   digitalWrite(ACTIVITYLED, HIGH);
 
   Serial.println(">M115");
-  __estop__ = false;
-  __error__ = false;
 
   sprintf(buffer, "Firmware_Name: %s Firmware_Version: %s (Github) Source_Code_URl: %s Machine_Type: %s\
   Nozzle_Count: %d Control_Board: %s Motor_Driver: %s Current_Monitor: %s UUID: %s", FIRMWARE_NAME, FIRMWARE_VERSION, GITHUB_URL, MACHINE_TYPE, \
@@ -426,6 +437,7 @@ void M115_reportFirmware() {
   
   Serial.println(buffer);
   Serial.println("!ok");
+
   #ifdef __ENABLE_NEOPIXEL__
     neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif 
@@ -443,8 +455,6 @@ void M119_endStopState() {
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
   Serial.println(">M119");
-  __error__ = false;
-  __error__ = false;
 
   n_max = (digitalRead(LIMIT_OPEN) == LOW) ? "triggered" : "open" ;
   n_min = (digitalRead(LIMIT_CLOSE) == LOW) ? "triggered" : "open" ;
@@ -485,7 +495,6 @@ void M220_setFeedrate() {
   #endif
   digitalWrite(ACTIVITYLED, HIGH); 
 
-  __estop__ = false;
   if (checkParms() == 1) { // ERROR So do nothing
     return;
   }
@@ -502,7 +511,7 @@ void M220_setFeedrate() {
   Serial.print(_timeout);
   #ifdef __ENABLE_NEOPIXEL__
     Serial.print(" d:");
-    Serial.println(_brightness);
+    Serial.println(__brightness__);
   #endif 
 
   Serial.println("!ok");
@@ -521,8 +530,8 @@ void M303_autotune() {
     neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif  
   digitalWrite(ACTIVITYLED, HIGH);
+
   Serial.println(">M303");
-  __estop__ = false;
 
   // if [C<value>] is sent get the value and save it
   if (GCode.availableValue('C')) {
@@ -560,7 +569,7 @@ void M804_openNozzleMagazine() {
     unsigned long time1 = 0, time2 = 0;
 
     if (__estop__ == true) {
-      Serial.println("Machine is E-STOPPED");
+      Serial.println("E-STOP");
       Serial.println("!error");
       return;
     }
@@ -727,7 +736,7 @@ void M804_openNozzleMagazine() {
 
       #ifdef __ENABLE_ESTOP_SWITCH__
       if (__estop__ == true) {
-        Serial.println("Machine is E-STOPPED");
+        Serial.println("E-STOP");
         Serial.println("!error");
         return;
       } 
@@ -871,20 +880,26 @@ void M804_openNozzleMagazine() {
 //
 void openNozzleMagazine() {
 
-    if (__estop__ == true) {
-      Serial.println("Machine is E-STOPPED");
-      Serial.println("!error");
-      return;
-    }
+    Serial.println(";Open Button Pressed"); // echo the command
     #ifdef __ENABLE_NEOPIXEL__
       neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
     digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
-    Serial.println(";Open Button Pressed"); // echo the command
+
+    if (__estop__ == true) {
+      Serial.println("E-STOP");
+      Serial.println("!error");
+      #ifdef __ENABLE_NEOPIXEL__
+        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+      digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
 
     // If the LIMIT_OPEN is already set just exit since we already are open
     if (digitalRead(LIMIT_OPEN) == LOW) {
       Serial.println(";Already Open");
+      Serial.println("!ok");
       #ifdef __ENABLE_NEOPIXEL__
         neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
       #endif
@@ -940,16 +955,21 @@ void openNozzleMagazine() {
 //
 void closeNozzleMagazine() {
 
-    if (__estop__ == true) {
-      Serial.println("Machine is E-STOPPED");
-      Serial.println("!error");
-      return;
-    }
+    Serial.println(";Close Button Pressed"); // echo the command
     #ifdef __ENABLE_NEOPIXEL__
       neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
     digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
-    Serial.println(";Close Button Pressed"); // echo the command
+
+    if (__estop__ == true) {
+      Serial.println("E-STOP");
+      Serial.println("!ok");
+      #ifdef __ENABLE_NEOPIXEL__
+        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+        digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
 
     // If the LIMIT_CLOSE is already closed just exit since we already are closed
     if (digitalRead(LIMIT_CLOSE) == LOW) {
@@ -1009,7 +1029,7 @@ void setup() {
 
   // Call to start GCODE Object
   GCode.begin(115200, ">"); //responce => ok, rs or !!
-  while(!Serial.availableForWrite()) {};
+  while(!Serial.availableForWrite()) {}; // wait for serial to become available
   
   Serial.println("Nozzle Magazine Controller (c) 2022 KBAstronomics");
 
@@ -1105,30 +1125,24 @@ void setup() {
 }
 
 void loop() {
-static bool _sleeping = false;
 
   // see if there is a GCODE command available and if not we're waiting  
-  (GCode.available()) ? _sleeping = false : _sleeping = true ; 
+  (GCode.available()) ? __sleeping__ = false : __sleeping__ = true ; 
 
   // if ESTOP is defined get button and if pressed stop motor
   #ifdef __ENABLE_ESTOP_SWITCH__
     estop_switch.update();
     if (estop_switch.pressed()) {
-      __estop__ = true;
-      deltaprintr_motor.breakdown(0, 0);
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      Serial.println(";Emergincy Stop Triggered");
-      Serial.println("!error");
+      M112_estop();
     }
     if ( estop_switch.released()) {
       __estop__ = false;
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      Serial.println(";Emergincy Stop Trigger cleared");
+      Serial.println("E-STOP Cleared");
       Serial.println("!ok");
+      #ifdef __ENABLE_NEOPIXEL__
+        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+      digitalWrite(ACTIVITYLED, LOW);
     }
   #endif
 
@@ -1150,16 +1164,16 @@ static bool _sleeping = false;
 
   // check several triggers for if the status led should be BLUE(OK) or RED (ERROR CONDITION)
   #ifdef __ENABLE_NEOPIXEL__
-    if ( __estop__ == false && __error__ == false ) {
+    if ( __estop__ == false && __error__ == false && __sleeping__ == false ) {
       neopixel_led(NEOPIXEL_BLUE, NEOPIXEL_ON);
-    } else {
-      neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON);
-    }
+    } 
+    // else {
+    //   neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF);
+    // }
 
     // this should only be called after a timeout value
-    if ( _sleeping == true ) { 
+    if ( __sleeping__ == true ) { 
       strips_loop();
     }
-
   #endif 
 }

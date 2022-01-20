@@ -11,7 +11,7 @@
 
 #include <DRV8871.h> // https://github.com/dirkk1980/arduino_adafruit-drv8871
 #include <gcode.h>   // https://github.com/tinkersprojects/G-Code-Arduino-Library
-#include <Bounce2.h> // https://github.com/thomasfredericks/Bounce2
+
 
 // FIRMWARE/CONTROLER  INFORMAITON
 #define FIRMWARE_NAME       "Nozzle Magazine"
@@ -31,10 +31,6 @@
 #define UUID                "6fc71526-82e3-4c48-b30d-5c81313cd1fd"
 #define NUMBER_MAGAZINES    1
 
-// PIN_PA31D_SERCOM1_PAD3 (31L)
-// LED_BUILTIN PIN_LED_13  (13u)
-// PIN_NEOPIXEL NEOPIXEL_BUILTIN  (40u)
-
 //pin configuration for Adafruit Metro Express
 #ifdef ADAFRUIT_METRO_M0_EXPRESS
     #define MOTOR_IN1               9
@@ -42,21 +38,25 @@
     #define LIMIT_CLOSE             11
     #define LIMIT_OPEN              12
     #ifdef __ENABLE_ESTOP_SWITCH__
-        #define ESTOP_SWITCH        7
+      #define ESTOP_SWITCH        7
     #endif
-    #define OPEN_BUTTON             2
-    #define CLOSE_BUTTON            3
+    #ifdef __ENABLE_OC_SWITCH__
+      #define OPEN_BUTTON             2
+      #define CLOSE_BUTTON            3
+    #endif
     #ifdef __ENABLE_NEOPIXEL__
-        #define NEOPIXEL_PIN        40
+      #define NEOPIXEL_PIN        40
     #endif 
     #define ACTIVITYLED             LED_BUILTIN   // LED_BUILTIN PIN_LED_13  (13u)
 #endif
 
-//pin configuration for Adafruit Trinket M0
+//pin configuration for Adafruit Trinket M0 
+//fewer IO pins so can't do everything at same time
 #ifdef ADAFRUIT_TRINKET_M0
     #define MOTOR_IN1               4
     #define MOTOR_IN2               5
     #define LIMIT_CLOSE             2
+    #define LIMIT_OPEN              3
     #ifdef __ENABLE_ESTOP_SWITCH__
         #define ESTOP_SWITCH        0
     #endif
@@ -66,22 +66,9 @@
     #endif 
 #endif
 
-//pin configuration for the KBAstronomic Nozzle Magazine Control Board
-#ifdef KBASTRO_NOZZLE_MAGAZINE
-    #define MOTOR_IN1               9
-    #define MOTOR_IN2               10
-    #define LIMIT_CLOSE             11
-    #define LIMIT_OPEN              12
-    #ifdef __ENABLE_ESTOP_SWITCH__
-        #define ESTOP_SWITCH        7
-    #endif
-    #define OPEN_BUTTON             2
-    #define CLOSE_BUTTON            3
-    #ifdef __ENABLE_NEOPIXEL__
-        #define NEOPIXEL_PIN        40
-    #endif 
-    #define ACTIVITYLED             LED_BUILTIN
-#endif
+// Just to make code more readable
+#define CLOSED  false
+#define OPEN    true
 
 // declarations
 int checkParms();                   // SUPPORT FUNCTION TO READ COMMON PARMS               
@@ -96,15 +83,7 @@ void M303_autotune();               // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
 void M804_openNozzleMagazine();     // M804 S<VALUE> A<VALUE> D<VALUE>
 void M805_closeNozzleMagazine();    // M805 S<VALUE> A<VALUE> D<VALUE>
 
-
-#ifdef __ENABLE_TEST_CODE__
-    void T1_test(); // Dummy Code to do some timing tests
-#endif 
-
-DRV8871 deltaprintr_motor(
-  MOTOR_IN1,
-  MOTOR_IN2
-);
+// GLOBAL VARIABLES
 
 int _speed = 220; // Max value to not stall @ 12V VMotor,  254 @ 9V VMotor 
 int _acceleration = 0; // No Acceleration Delay
@@ -112,14 +91,19 @@ int _brake = 0; // STOP IMMEDIATE
 int _debug_module = 0; // P<MODEULE> where P=G/M Code
 int _debug_level = 0; // S<LEVEL> where 0=OFF, 1=ON
 unsigned long _timeout = 2000; // sdefault timeout value of 2 seconds
-static bool __estop__ = false;
-static bool __error__ = false; 
+bool __estop__ = false;
+bool __error__ = false; 
+bool __sleeping__ = false;
+bool __oc_state__ = CLOSED;
 
-#ifdef __ENABLE_TEST_CODE__
-    #define NumberOfCommands 11
-#else
-    #define NumberOfCommands 10
-#endif
+DRV8871 deltaprintr_motor(
+  MOTOR_IN1,
+  MOTOR_IN2
+);
+
+
+#define NumberOfCommands 10
+
 
 commandscallback commands[NumberOfCommands] = {
   {
@@ -172,7 +156,6 @@ commandscallback commands[NumberOfCommands] = {
 
 gcode GCode(NumberOfCommands, commands);
 
-
 // To add current monitoring uncomment the #define __USE_INA219__ in the main file
 #ifdef __ENABLE_INA219__
     #include <Wire.h>
@@ -200,23 +183,30 @@ gcode GCode(NumberOfCommands, commands);
 // Add support files for the NEOPIXEL Status LED
 #ifdef __ENABLE_NEOPIXEL__
     #include <Adafruit_NeoPixel.h>
-    void neopixel_led(uint8_t color);
 
     #define NUMPIXELS       1
 
+    void neopixel_led(uint8_t color);
+
     uint8_t rgb_values[3];
-    int _brightness = 128;  
+    int __brightness__ = 128;  
 
     #define NEOPIXEL_RED    1
     #define NEOPIXEL_GREEN  2
     #define NEOPIXEL_BLUE   3
     #define NEOPIXEL_WHITE  4
-    #define NEOPIXEL_ON     _brightness
+    #define NEOPIXEL_ON     __brightness__
     #define NEOPIXEL_OFF    0
 
     Adafruit_NeoPixel strip(NUMPIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-        
+    // CODE TO SUPPORT PULSING NEOPIXEL
+    uint8_t strip0_loop0_eff0();
+    uint8_t strip0_loop0_eff1();
+    uint8_t strip0_loop0();
+    void strips_loop();
+    void neopixel_led(uint8_t color, uint8_t brightness);
+
     class Strip
     {
     public:
@@ -247,8 +237,8 @@ gcode GCode(NumberOfCommands, commands);
       Loop(uint8_t totchilds, bool timebased, uint16_t tottime) {currentTime=0;currentChild=0;childs=totchilds;timeBased=timebased;cycles=tottime;}
     };
 
-    Strip strip_0(1, NEOPIXEL_BUILTIN, 1, NEO_GRB + NEO_KHZ800);
-    struct Loop strip0loop0(1, false, 1);
+    Strip strip_0(1, NEOPIXEL_PIN, 1, NEO_GRB + NEO_KHZ800);
+    struct Loop strip0loop0(2, false, 1);
 
 #endif
 
@@ -258,15 +248,14 @@ gcode GCode(NumberOfCommands, commands);
 #endif
 
 #ifdef __ENABLE_OC_SWITCH__
+    #include <Bounce2.h> // https://github.com/thomasfredericks/Bounce2
     //static bool oc_state = 0;    
     #define __NUM_OC_BUTTONS__ 2 
 
     void openNozzleMagazine(); // Manual override to open nozzle
     void closeNozzleMagazine(); // Manual override to close nozzle
-#endif 
 
-// Create open/close buttons
-#ifdef __ENABLE_OC_SWITCH__
+    // Create open/close buttons
     Bounce2::Button open_switch = Bounce2::Button();
     Bounce2::Button close_switch = Bounce2::Button();
 #endif 
@@ -277,7 +266,6 @@ gcode GCode(NumberOfCommands, commands);
 #endif
 
 #endif
-
 // SAMPLE INIT STRING
 // GET FIRNWARE INFO, SET SPEED/ACCEL/BREAK, Check Position and Make sure closed
 // M115 M220 S220 A0 B0 M114 M805
