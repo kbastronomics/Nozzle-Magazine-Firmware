@@ -25,15 +25,17 @@ Uses a ATSAMD21 + DRV8871 Motor Driver to control the Nozzle Magazine
 
 ## GCODEs Supported 
 
-- M111 to enable Debugging
+- M111 P[VALUE] L[VALUE] to enable Debugging 
+- M112 P[VALUE] to E-STOP
 - M114 to report Open/Close
 - M115 to report Firmware Data 
 - M119 to report limit switch status
 - M220 to Set Speed, Acceleration, Braking and Timeout
+- M303 to Autotune (not yet implemented)
 - M804 to Open the Nozzle Holder
 - M805 to Close the Nozzle Holder
 
-Default Init String is **M220 S220 A0 B0 T2000**
+Default Init String is **M220 S220 A0 B0 T2000 D128**
 
 
 
