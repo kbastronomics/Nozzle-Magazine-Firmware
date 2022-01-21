@@ -85,16 +85,16 @@ void M805_closeNozzleMagazine();    // M805 S<VALUE> A<VALUE> D<VALUE>
 
 // GLOBAL VARIABLES
 
-int _speed = 220; // Max value to not stall @ 12V VMotor,  254 @ 9V VMotor 
-int _acceleration = 0; // No Acceleration Delay
-int _brake = 0; // STOP IMMEDIATE
-int _debug_module = 0; // P<MODEULE> where P=G/M Code
-int _debug_level = 0; // S<LEVEL> where 0=OFF, 1=ON
-unsigned long _timeout = 2000; // sdefault timeout value of 2 seconds
-bool __estop__ = false;
-bool __error__ = false; 
-bool __sleeping__ = false;
-bool __oc_state__ = CLOSED;
+int iSpeed = 220; // Max value to not stall @ 12V VMotor,  254 @ 9V VMotor 
+int iAcceleration = 0; // No Acceleration Delay
+int iBrake = 0; // STOP IMMEDIATE
+int iDebugmodule = 0; // P<MODEULE> where P=G/M Code
+int iDebuglevel = 0; // S<LEVEL> where 0=OFF, 1=ON
+unsigned long ulTimeout = 2000; // sdefault timeout value of 2 seconds
+bool bEstop = false;
+bool bError = false; 
+bool bWaiting = false;
+bool bOCstate = CLOSED;
 
 DRV8871 deltaprintr_motor(
   MOTOR_IN1,
@@ -168,34 +168,33 @@ gcode GCode(NumberOfCommands, commands);
     INA219_WE ina219 = INA219_WE(I2C_ADDRESS);
 
     // define some global variables.   Maybe move into a structure instead???
-    float total_mA;
-    unsigned long total_sec;
-    float shuntvoltage;
-    float busvoltage;
-    float current_mA;
-    float loadvoltage;
-    float power_mW;
-    float total_mAH;
-    float peekCurrent_mA;
-    bool ina219_overflow = false;
+    float fTotalmA;
+    unsigned long ulTotalsec;
+    float fShuntvoltage;
+    float fBusvoltage;
+    float fCurrentmA;
+    float fLoadvoltage;
+    float fPowermW;
+    float fTotalmAH;
+    float fPeekCurrentmA;
+    bool bIna219overflow = false;
 #endif
 
 // Add support files for the NEOPIXEL Status LED
 #ifdef __ENABLE_NEOPIXEL__
     #include <Adafruit_NeoPixel.h>
 
-    #define NUMPIXELS       1
-
     void neopixel_led(uint8_t color);
 
-    uint8_t rgb_values[3];
-    int __brightness__ = 128;  
+    int iBrightness = 200;  
+    int iPulsespeed = 2000;  // default 2000 slow pulse for blue waiting,  1000 for red estop
 
+    #define NUMPIXELS       1
     #define NEOPIXEL_RED    1
     #define NEOPIXEL_GREEN  2
     #define NEOPIXEL_BLUE   3
     #define NEOPIXEL_WHITE  4
-    #define NEOPIXEL_ON     __brightness__
+    #define NEOPIXEL_ON     iBrightness
     #define NEOPIXEL_OFF    0
 
     Adafruit_NeoPixel strip(NUMPIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -256,13 +255,13 @@ gcode GCode(NumberOfCommands, commands);
     void closeNozzleMagazine(); // Manual override to close nozzle
 
     // Create open/close buttons
-    Bounce2::Button open_switch = Bounce2::Button();
-    Bounce2::Button close_switch = Bounce2::Button();
+    Bounce2::Button Openswitch = Bounce2::Button();
+    Bounce2::Button Closeswitch = Bounce2::Button();
 #endif 
 
 // TO add EEPROM support to store settings uncomment the #define __USE_EEPROM__ in the main file
 #ifdef __ENABLE_ESTOP_SWITCH__
-    Bounce2::Button estop_switch = Bounce2::Button();
+    Bounce2::Button Estopswitch = Bounce2::Button();
 #endif
 
 #endif
