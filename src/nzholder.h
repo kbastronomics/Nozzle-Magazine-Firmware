@@ -73,15 +73,17 @@
 // declarations
 int checkParms();                   // SUPPORT FUNCTION TO READ COMMON PARMS               
 void G4_pause();                    // G4 S<VALUE>
-void M111_debug();                  // M111 P<MODULE> L<LEVEL>
-void M112_estop();                  // M112
-void M114_reportPostion();          // M114 Report Postion
-void M115_reportFirmware();         // M115 Report Firmware Information
-void M119_endStopState();           // M119 Report Endstop State
-void M220_setFeedrate();            // M220 S<VALUE> A<VALUE> D<VALUE>
-void M303_autotune();               // ATTEMPT TO CREATE A AUTOTUNING FUNCTION
-void M804_openNozzleMagazine();     // M804 S<VALUE> A<VALUE> D<VALUE>
-void M805_closeNozzleMagazine();    // M805 S<VALUE> A<VALUE> D<VALUE>
+void M42_pinstate();                // M42 - Set Pin State / M42 [M<0|1|2|3>] [P<pin>] S<state>
+void T100_test();                   // M100 - Print Tests
+void M111_debug();                  // M111 - Debug Level / M111 [S<flags>]
+void M112_estop();                  // M112 - Emergency Stop / M112 [P<level>]
+void M114_reportPostion();          // M114 - Get Current Position / M114 [D] [E] [R]
+void M115_reportFirmware();         // M115 - Firmware Info / M115
+void M119_endStopState();           // M119 - Endstop States / M119
+void M220_setFeedrate();            // M220 - Set Feedrate Percentage / M220 S<VALUE> A<VALUE> D<VALUE>
+void M303_autotune();               // M303 - PID autotune / M303 C<count> D<action> D<flag> [E<index>] S<temp> U<flag> (TBD)
+void M804_openNozzleMagazine();     // M804 - Open Nozzle Magazine / M804 S<VALUE> A<VALUE> D<VALUE>
+void M805_closeNozzleMagazine();    // M805 - Close Nozzle Magazine / M805 S<VALUE> A<VALUE> D<VALUE>
 
 // GLOBAL VARIABLES
 
@@ -102,20 +104,22 @@ DRV8871 deltaprintr_motor(
 );
 
 
-#define NumberOfCommands 10
+#define NumberOfCommands 12
 
 
 commandscallback commands[NumberOfCommands] = {
   {
+    "T100",
+    T100_test
+  }, // 
+  {
     "G4",
     G4_pause
-  }, // G4 P<VALUE>  IGNORED
-#ifdef __ENABLE_TEST_CODE__
+  }, // G4 P<VALUE>  
   {
-    "T1",
-    T1_test
-  }, // T1 
-#endif 
+    "M42",
+    M42_pinstate
+  }, // M43
   {
     "M111",
     M111_debug
@@ -194,6 +198,8 @@ gcode GCode(NumberOfCommands, commands);
     #define NEOPIXEL_GREEN  2
     #define NEOPIXEL_BLUE   3
     #define NEOPIXEL_WHITE  4
+    #define NEOPIXEL_AMBER  5
+    #define NEOPIXEL_YELLOW 6
     #define NEOPIXEL_ON     iBrightness
     #define NEOPIXEL_OFF    0
 
