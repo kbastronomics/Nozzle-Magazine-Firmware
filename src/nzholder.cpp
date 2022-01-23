@@ -3,17 +3,32 @@
  * by Sandra Carroll <smgvbest@gmail.com> https://github.com/kbastronomics/Nozzle-Magazine-Firmware
  *
  * This firmware is licensed under a GPLv3 License
+ * 
+ * Deltaprinter Nozzle Magazine Driver is free software: you can redistribute it and/or modify it 
+ * under the terms of the GNU General Public License version 3 as published by the 
+ * Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without 
+ * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ * See the GNU General Public License for more details.
+ * 
+ * For more specific details see http://www.gnu.org/licenses, the Quick Guide to GPLv3. 
+ * 
+ * The GNU operating system has an informative GPL FAQ https://www.gnu.org/licenses/gpl-faq.html.
+ * 
  **************************************************************************************************/
 
-// Uncomment to use these features
-#define __LARGE_NOZZLE__              // Uncomment for large Nozzle Magazine (20)
-//#define __SMALL_NOZZLE__            // Uncomment for small Nozzle Magazine (10)
-#define __ENABLE_ESTOP_SWITCH__       // Add a Physical E-STOP switch to board 
-#define __ENABLE_OC_SWITCH__          // Add Physical Open/Close Switches on board
-#define __ENABLE_INA219__             // Add INA219 current monitoring on board
+//
+// Uncomment To Use These Features
+//
+#define __LARGE_NOZZLE__              // Uncomment for large Nozzle Magazine (20) Affects M115 Only
+//#define __SMALL_NOZZLE__            // Uncomment for small Nozzle Magazine (10) Affects M115 Only
+#define __ENABLE_ESTOP_BUTTON__       // Add a Physical E-STOP button support  
+#define __ENABLE_OC_BUTTON__          // Add Physical Open/Close button support
+#define __ENABLE_INA219__             // Add INA219 current monitoring support 
 #define __ENABLE_NEOPIXEL__           // Enables the NeoPixel in addition to the BUILTIN LED for status
-                                      // Blue waiting, Green executing, Red Error, Pulsing Red ESTOP
-//#define __ENABLE_EEPROM__           // Add EEPROM to store settings board
+                                      // Blue:Waiting, Green:Executing, Solid Red:Error, Pulsing Red:ESTOP
+//#define __ENABLE_FRAM__             // Add FRAM to store settings board (Not Yet Implemented and may not be)
 
 #include "nzholder.h"
 
@@ -102,7 +117,7 @@ void strips_loop() {
 // neopixel_led(): Turn On/Off the NeoPixel for fixed colors
 // used for OK/ERROR indication
 //
-void neopixel_led(uint8_t color, uint8_t brightness) {
+void NeoPixelLed(uint8_t color, uint8_t brightness) {
 
 strip.setBrightness(brightness);
 
@@ -137,7 +152,7 @@ strip.setBrightness(brightness);
 //
 // read_ina219:  Read the INA219 and store values into globals
 //
-void read_ina219() {
+void ReadINA219() {
   // Read voltage and current from INA219.
 
   fShuntvoltage = ina219.getShuntVoltage_mV();
@@ -157,90 +172,64 @@ void read_ina219() {
   ulTotalsec += 1;
   fTotalmAH = fTotalmA / ulTotalsec;  
 
-  Serial.printf(";Line %i: sv(%3.2f) bv(%3.2f) cmA(%3.2f) ",__LINE__,fShuntvoltage,fBusvoltage,fCurrentmA);  
-  Serial.printf("pmA(%3.2f) lv(%3.2f) pmW(%3.2f) maH(%3.2f)\n",fPeekCurrentmA,fLoadvoltage,fPowermW,fTotalmAH);  
- 
-  // Serial.print(";sv: "); 
-  // Serial.print(fShuntvoltage);
-  // Serial.print(" bv: ");
-  // Serial.print(fBusvoltage);
-  // Serial.print(" cmA: ");
-  // Serial.print(fCurrentmA);
-  // Serial.print(" pmA: ");
-  // Serial.print(fPeekCurrentmA);
-  // Serial.print(" lv: ");
-  // Serial.print(fLoadvoltage);
-  // Serial.print(" pmW: ");
-  // Serial.print(fPowermW);
-  // Serial.print(" tmAH: ");
-  // Serial.println(fTotalmAH);
+  // Serial.printf does not like long strings so broken into two
+  if (iDebugLevel > 0 ) { 
+    Serial.printf(";Line %i: sv(%3.2f) bv(%3.2f) cmA(%3.2f) ",__LINE__,fShuntvoltage,fBusvoltage,fCurrentmA);  
+    Serial.printf("pmA(%3.2f) lv(%3.2f) pmW(%3.2f) maH(%3.2f)\n",fPeekCurrentmA,fLoadvoltage,fPowermW,fTotalmAH);
+  } else {
+    Serial.printf(";sv(%3.2f) bv(%3.2f) cmA(%3.2f) ",fShuntvoltage,fBusvoltage,fCurrentmA);  
+    Serial.printf("pmA(%3.2f) lv(%3.2f) pmW(%3.2f) maH(%3.2f)\n",fPeekCurrentmA,fLoadvoltage,fPowermW,fTotalmAH);
+  }  
 }
 #endif
-
-void T100_test() {
-bool bTest=false;
-int iTest=199;
-unsigned long ulTest=1919191919;
-double dTest=3.14159;
-float fTest=182282.3972;
-String sTest="This is a String";
-char cTest[80]="This is a char array";
-
-Serial.printf("T100 printf Tests\n");
-Serial.printf("Bool %s\n",bTest?"TRUE":"FALSE");
-Serial.printf("INT %i\n",iTest);
-Serial.printf("ULONG %u\n",ulTest);
-Serial.printf("FAIL:DOUBLE %d\n",dTest);
-Serial.printf("FLOAT %f\n",fTest);
-Serial.printf("FAIL:STRING %s\n",sTest);
-Serial.printf("CHAR %s\n",cTest);
-
-}
 
 //
 // checkParms:   Checks for the S,A,B,T,D PARMS and stores the results in globals
 //
-int checkParms() {
+int CheckParms() {
   int _nSpeedtmp = iSpeed;
   int _nAccellerationtmp = iAcceleration;
   int _nBreaktmp = iBrake;
   int _timeouttmp = ulTimeout;
+  int rc = 0;
+
   #ifdef __ENABLE_NEOPIXEL__
     int _brightnesstmp = iBrightness;
   #endif
-  int rc = 0;
-
+  
   // rc=0 no parms passed
   // rc=1 error in any of the parms parms
   // rc=2 parm passed
-
   // if [S<VALUE>] is sent get the value and save it
   if (GCode.availableValue('S')) {
     iSpeed = (int) GCode.GetValue('S');
     if (iSpeed < 0 || iSpeed >= 255) {
-      Serial.printf(";L%iL Error: S Value(%i) out of range\n",__LINE__,iSpeed);
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: S Value(%i) out of range\n",__LINE__,iSpeed) : 
+        Serial.printf(";Error: S Value(%i) out of range\n",iSpeed);
       iSpeed = _nSpeedtmp;
       Serial.println("error");
       return 1;
     }
     rc = 2;
   }
-  // if [A<Milliseconds>] is sent get the value and save it
+  // if A[VALUE] is sent get the value and save it
   if (GCode.availableValue('A')) {
     iAcceleration = (int) GCode.GetValue('A');
     if (iAcceleration < 0 || iAcceleration > 1000) {
-      Serial.printf(";Line %i: Error: A Value(%i) out of range\n",__LINE__,iAcceleration);
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: A Value(%i) out of range\n",__LINE__,iAcceleration) : 
+        Serial.printf(";Error: A Value(%i) out of range\n",iAcceleration);
       iAcceleration = _nAccellerationtmp;
       Serial.printf("error\n");
       return 1;
     }
     rc = 2;
   }
-  // if [B<value>] is sent get the value and save it
+  // if B[VALUE] is sent get the value and save it
   if (GCode.availableValue('B')) {
     iBrake = (int) GCode.GetValue('B');
     if (iBrake < 0 || iBrake > 100) {
-      Serial.printf(";Line %i: Error: B Value(%i) out of range\n",__LINE__,iBrake);
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: B Value(%i) out of range\n",__LINE__,iBrake) :
+        Serial.printf(";Error: B Value(%i) out of range\n",iBrake);
       iBrake = _nBreaktmp;
       Serial.printf("error\n");
       return 1;
@@ -248,11 +237,12 @@ int checkParms() {
     rc = 2;
   }
 
-  // if [T<value>] is sent get the value and save it
+  // if T[VALUE] is sent get the value and save it
   if (GCode.availableValue('T')) {
     ulTimeout = (int) GCode.GetValue('T');
     if (ulTimeout < 0 || ulTimeout > 10000) {
-      Serial.printf(";Line %i: Error: T Value(%u) out of range\n",__LINE__,ulTimeout);
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: T Value(%u) out of range\n",__LINE__,ulTimeout) : 
+        Serial.printf(";Error: T Value(%u) out of range\n",ulTimeout);
       ulTimeout = _timeouttmp;
       Serial.printf("error\n");
       return 1;
@@ -260,11 +250,12 @@ int checkParms() {
   }
 
   #ifdef __ENABLE_NEOPIXEL__
-  // if [D<value>] is sent get the value and save it
+  // if D[VALUE] is sent get the value and save it
   if (GCode.availableValue('D')) {
     iBrightness = (int) GCode.GetValue('D');
     if (iBrightness < 0 || iBrightness > 255) {
-      Serial.printf(";Line %i: Error: D Value(%i) out of range\n",__LINE__,iBrightness);
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: D Value(%i) out of range\n",__LINE__,iBrightness) : 
+        Serial.printf(";Error: D Value(%i) out of range\n",iBrightness);
       iBrightness = _brightnesstmp;
       Serial.printf("error\n");
       return 1;
@@ -285,17 +276,25 @@ int checkParms() {
 //
 
 //
-// G4_pause:  Delays for value S in seconds or P in Milliseconds 
+// G4_Dwell:  Delays for value S in seconds or P in Milliseconds 
 // Has no real effect due to blocking nature of calls
 //
-void G4_pause() {
+void G4_Dwell() {
   int delayvaule = 0;
 
-  #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON);
-  #endif
+  if (bEstop == true) {
+      Serial.printf("E-STOP\n");
+      Serial.printf(";Cannot change issue G4 while ESTOPPED\n");
+      Serial.printf("error\n");
+      return;
+  }
 
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON);
+  #endif
+  
   Serial.printf("G4\n");
+
   // if [S<VALUE<] this is in seconds so multiple by 1000 
   if (GCode.availableValue('S')) {
     delayvaule = (unsigned long) GCode.GetValue('S') * 1000;
@@ -310,7 +309,7 @@ void G4_pause() {
   Serial.printf("ok\n");
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF);
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF);
   #endif
 }
 
@@ -323,14 +322,21 @@ void G4_pause() {
 //    F3: INPUT_PULLDOWN
 // [P<pin>]	A digital pin number (even for analog pins) to write to. (LED_PIN if omitted)
 // S<state>	The state to set. PWM pins may be set from 0-255.
-void M42_pinstate() {   
+void M42_SetPinState() {   
   int iPinMode=0;
   int iPinState=0;
   int iPin=0;
   int iResult=0;
 
+  if (bEstop == true) {
+      Serial.printf("E-STOP\n");
+      Serial.printf(";Cannot issue M42 while ESTOPPED\n");
+      Serial.printf("error\n");
+      return;
+  }
+
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
 
@@ -340,10 +346,11 @@ void M42_pinstate() {
   if (GCode.availableValue('F')) {
     iPinMode = (int) GCode.GetValue('F');
     if ( iPinMode < 0 || iPinMode > 3 ) {
-      Serial.printf(";Line %i: Error: F(%i) Value out of range\n",__LINE__,iPinMode);
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: F(%i) Value out of range\n",__LINE__,iPinMode) : 
+        Serial.printf(";Error: F(%i) Value out of range\n",iPinMode);
       Serial.printf("error\n");
       #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
       #endif
       if( iPin != ACTIVITYLED) // doing this if your trying to control the LED_BUILTIN
         digitalWrite(ACTIVITYLED, LOW); 
@@ -354,12 +361,27 @@ void M42_pinstate() {
   if (GCode.availableValue('P')) {
     iPin = (int) GCode.GetValue('P');
     if (iPin < 0 || iPin >= 50) {
-      Serial.printf(";Line %i: Error: P(%i) Value out of range\n",__LINE__,iPin);
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: P(%i) Value out of range\n",__LINE__,iPin) : 
+        Serial.printf(";Error: P(%i) Value out of range\n",iPin);
       Serial.printf("error\n");
       #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
       #endif
-      if( iPin != 13)  // doing this if your trying to control the LED_BUILTIN
+      if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
+        digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
+  } 
+
+  for (int i=0; i < PINCOUNT; i++) {
+    if( PinArrary[i] == iPin ) {
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: P(%i) is a reserved pin\n",__LINE__,iPin) : 
+        Serial.printf(";Error: P(%i) is a reserved pin\n",iPin);
+      Serial.printf("error\n");
+      #ifdef __ENABLE_NEOPIXEL__
+        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+      #endif
+      if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
         digitalWrite(ACTIVITYLED, LOW);
       return;
     }
@@ -368,12 +390,13 @@ void M42_pinstate() {
   if (GCode.availableValue('S')) {
     iPinState = (int) GCode.GetValue('S');
     if (iPinState < 0 || iPinState >= 255) {
-      Serial.printf(";Line %i: Error: S(%i) Value out of range",__LINE__,iPinState);
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: S(%i) Value out of range",__LINE__,iPinState) : 
+        Serial.printf(";Error: S(%i) Value out of range",iPinState);
       Serial.println("error");
       #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
       #endif
-      if( iPin != 13) // doing this if your trying to control the LED_BUILTIN
+      if( iPin != ACTIVITYLED) // doing this if your trying to control the LED_BUILTIN
         digitalWrite(ACTIVITYLED, LOW);
       return;
     }
@@ -398,7 +421,8 @@ void M42_pinstate() {
       iResult = digitalRead(iPin);
       break;
     default:
-      Serial.printf(";Line %i: Invalid PINMODE Specified\n",__LINE__);
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Invalid PINMODE Specified\n",__LINE__) :
+         Serial.printf(";Invalid PINMODE Specified\n");
       break;
   }
   
@@ -410,84 +434,115 @@ void M42_pinstate() {
 
   Serial.printf("ok\n");
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
-  if( iPin != 13) // doing this if your trying to control the LED_BUILTIN
+  if( iPin != ACTIVITYLED) // doing this if your trying to control the LED_BUILTIN
     digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M111_debug:  Sets Debug Flags P<MODULE> L<LEVEL>
-// L[LEVEL] 0=DISABLE, 1=DEBUG
+// M111_DebugLevel:  Sets Trace Flags T<LEVEL>
+// T[LEVEL] T0=OFF, T1=Messages, T2=T1+INA219, T3=T1+TIMMING
 //
-void M111_debug() {
+void M111_DebugLevel() {
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
 
   Serial.printf("M111\n");
 
-  // if [L<VALUE<] this is debug level (L0=OFF, L1=MODULE ONLY, L2=ALL) 
-  iDebuglevel = (int) (GCode.availableValue('L')) ? GCode.GetValue('L') : 0 ;
-
-  Serial.printf(";Debug L:%i\n",iDebuglevel);
+  // if [S<VALUE<] this is debug level (S0=OFF, S1=Messages, S2=S1+INA219, S3=S1+TIMMING) 
+  iDebugLevel = (int) (GCode.availableValue('S')) ? GCode.GetValue('S') : 0 ;
+  
+  Serial.printf(";Debug Level S(%i)\n",iDebugLevel);
   Serial.printf("ok\n");
+  
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M112_estop:  Cause an immediate stop to motion
+// M112_EmergencyStop:  Cause an immediate stop to motion
 //
-void M112_estop() {
-
+void M112_EmergencyStop() {
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
 
   Serial.printf("M112\n");
   
-  // if [P<value>] If 1 clear ESTOP and we're done
-  if (GCode.availableValue('P')) {
-    int value = (int) GCode.GetValue('P');
-    if (value == 1 ) {
-      bEstop = false;
-      Serial.printf("E-STOP Cleared\n");
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_BLUE, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-        iPulsespeed = 2000;
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
-  }
-
+  // if [S<value>] If 1 clear E-STOP and we're done
+  if (GCode.availableValue('S')) {
+    int value = (int) GCode.GetValue('S');
+    switch(value) {
+      case 0:
+        bEstop = true;
+        deltaprintr_motor.breakdown(0, 0);
+        Serial.printf("E-STOP\n");
+        Serial.printf("ok\n");
+        #ifdef __ENABLE_NEOPIXEL__
+          NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS RED DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          iPulsespeed = 600;
+        #endif
+        digitalWrite(ACTIVITYLED, LOW);
+        break;
+      case 1:
+        bEstop = false;
+        Serial.printf("E-STOP Cleared\n");
+        Serial.printf("ok\n");
+        #ifdef __ENABLE_NEOPIXEL__
+          NeoPixelLed(NEOPIXEL_BLUE, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          iPulsespeed = 2000;
+        #endif
+        digitalWrite(ACTIVITYLED, LOW);
+        return;
+        break;
+      default:
+        Serial.printf(";M112 S%i is out of range\n",value);
+        Serial.printf("error\n");
+        #ifdef __ENABLE_NEOPIXEL__
+          NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          iPulsespeed = 2000;
+        #endif
+        digitalWrite(ACTIVITYLED, LOW);
+        return;          
+        break;
+    } // Switch
+  } // Case
+  bEstop = !bEstop; // If M112 issue without S[BOOL] just Toggle bEstop flag
   deltaprintr_motor.breakdown(0, 0);
-  Serial.printf("E-STOP\n");
+  if ( bEstop == true ) {
+    Serial.printf("E-STOP\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      iPulsespeed = PULSEFAST;
+    #endif 
+  } else {
+    Serial.printf("E-STOP Cleared\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      iPulsespeed = PULSESLOW;
+    #endif
+  }
   Serial.printf("ok\n");
-  bEstop = true;
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS RED DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-    iPulsespeed = 600;
+    NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS RED DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, LOW);
-}
+} // function
 
 //
-// M114_reportPostion:  Reports current postion information
+// M114_GetCurrentPosition:  Reports current postion information
 //
-void M114_reportPostion() {
+void M114_GetCurrentPosition() {
   String sState = "";
   int istate = 0;
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
   Serial.printf("M114\n");
@@ -516,12 +571,15 @@ void M114_reportPostion() {
   }
 
   #ifdef __ENABLE_INA219__
-  if ( iDebuglevel == 1 ) {
-    read_ina219();
+  if ( iDebugLevel > 0 ) {
+    ReadINA219();
+    ( fBusvoltage < MINBUSVOLTAGE ) ? Serial.printf(";BusVoltage below (%3.2f)Vdc currently at (%3.2f)Vdc \n",MINBUSVOLTAGE, fBusvoltage) : 
+      Serial.printf(";BusVoltage Normal @ (%3.2f)Vdc\n",fBusvoltage);
+    fPeekCurrentmA = 0;
   }
   #endif
 
-  if ( iDebuglevel == 1 ) { // print vars
+  if ( iDebugLevel == 1 ) { // print vars
     Serial.printf(";Debug Line %i: error:%s estop:%s sleep:%s\n",__LINE__,bError?"true":"false",bEstop?"true":"false",bWaiting?"true":"false");
   }
   
@@ -531,19 +589,19 @@ void M114_reportPostion() {
   (istate > 0) ? Serial.printf("error\n") : Serial.printf("ok\n");
 
   #ifdef __ENABLE_NEOPIXEL__
-    ( bError == false) ? neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF) : neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON) ; 
+    ( bError == false) ? NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF) : NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON) ; 
   #endif
   digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M115_reportFirmware:   Reports firmware information
+// M115_FirmwareInfo:   Reports firmware information
 //
-void M115_reportFirmware() {
+void M115_FirmwareInfo() {
   char buffer[512];
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
 
@@ -558,20 +616,20 @@ void M115_reportFirmware() {
   Serial.printf("ok\n");
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif 
   digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M119_endStopState: report the current state of the endstops
+// M119_EndstopStates: report the current state of the endstops
 //
-void M119_endStopState() {
+void M119_EndstopStates() {
   bool n_min=false;
   bool n_max=false;
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH);
   Serial.printf("M119\n");
@@ -580,11 +638,11 @@ void M119_endStopState() {
   n_min = digitalRead(LIMIT_CLOSE);
 
   if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
-    Serial.printf(";Line %i: Magazine slide jammed\n",__LINE__);
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Magazine slide jammed\n",__LINE__) :Serial.printf(";Magazine slide jammed\n");
     Serial.printf("error\n");
     bError = true;
     #ifdef __ENABLE_NEOPIXEL__
-      neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
     digitalWrite(ACTIVITYLED, LOW);
     return;
@@ -594,23 +652,23 @@ void M119_endStopState() {
   Serial.printf("ok\n");
 
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF);
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF);
   #endif
   digitalWrite(ACTIVITYLED, LOW);
   return;
 }
 
 //
-// M220_setFeedrate: Sets the Speed, Acceleration and Brake values 
+// M220_SetFeedratePercentage: Sets the Speed, Acceleration and Brake values 
 //
-void M220_setFeedrate() {
+void M220_SetFeedratePercentage() {
   
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH); 
 
-  if (checkParms() == 1) { // ERROR So do nothing
+  if (CheckParms() == 1) { // ERROR So do nothing
     return;
   }
 
@@ -620,486 +678,497 @@ void M220_setFeedrate() {
 
   Serial.printf("ok\n");
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M303_autotune: Perform autotune to find the best speed and acceleration values
+// M303_PIDAutoTune: Perform autotune to find the best speed and acceleration values
 //
-void M303_autotune() {
-  int count = 5; // default number of cycles to find the optiman speed/acceleration values
+void M303_PIDAutoTune() {
+  int interations = 5; // default number of cycles to find the optiman speed/acceleration values
+
+  if (bEstop == true) {
+    Serial.printf("E-STOP\n");
+    Serial.printf(";Cannot issue M303 while ESTOPPED\n");
+    Serial.printf("error\n");
+    return;
+  }
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif  
   digitalWrite(ACTIVITYLED, HIGH);
 
   Serial.println("M303");
 
   // if [C<value>] is sent get the value and save it
-  if (GCode.availableValue('C')) {
-    count = (int) GCode.GetValue('C');
-    if (count <= 0 || count > 1000) {
-      Serial.printf(";Line %i: Error: C(%i) Value out of range\n",__LINE__,count);
+  if (GCode.availableValue('I')) {
+    interations = (int) GCode.GetValue('I');
+    if (interations <= 0 || interations > 1000) {
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: I(%i) Value out of range\n",__LINE__,interations) : Serial.printf(";Error: I(%i) Value out of range\n",interations);
       Serial.printf("ok\n");
       return;
     }
   }
 
   // INSERT AUTOTUNING HERE
-  for (int i = 0; i <= count; i++) {
-    #ifdef __ENABLE_ESTOP_SWITCH__
-    if (Estopswitch.pressed()) {
+  for (int i = 0; i <= interations; i++) {
+    #ifdef __ENABLE_ESTOP_BUTTON__
+    if (EStopButton.pressed()) {
       deltaprintr_motor.breakdown(0, 0);
-      Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__);
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__) : Serial.printf(";Emergincy Stop Triggered\n");
       Serial.printf("!estop\n");
     }
     #endif
-    GCode.comment('c', (double) count);
+    GCode.comment('c', (double) interations);
   }
+
   Serial.printf("ok\n");
   #ifdef __ENABLE_NEOPIXEL__
-    neopixel_led(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif  
   digitalWrite(ACTIVITYLED, LOW);
 }
 
 //
-// M804_openNozzlemagazine:  Open the magazine or report open if already open
+// M804_OpenNozzleMagazine:  Open the magazine or report open if already open
 //
-void M804_openNozzleMagazine() {
+void M804_OpenNozzleMagazine() {
     unsigned long time1 = 0, time2 = 0;
 
-    if (bEstop == true) {
+  if (bEstop == true) {
       Serial.printf("E-STOP\n");
+      Serial.printf(";Cannot issue M804 while E-STOPPED\n");
       Serial.printf("error\n");
       return;
+  }
+
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+  Serial.printf("M804\n"); // echo the command
+
+  // If the LIMIT_OPEN is already set just exit since we already are open
+  if (digitalRead(LIMIT_OPEN) == LOW) {
+    if (iDebugLevel == 1 ) {
+      Serial.printf(";Debug Line %i: digitalRead(LIMIT_OPEN) == LOW \n",__LINE__);  
+      Serial.printf(";Debug Line %i: Already open\n",__LINE__);
+      Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
     }
-  
+    Serial.printf(";Already open\n");
+    Serial.printf("n:open\n");
+    Serial.println("ok\n");
     #ifdef __ENABLE_NEOPIXEL__
-      neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
-    digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
-    Serial.printf("M804\n"); // echo the command
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
 
-    // If the LIMIT_OPEN is already set just exit since we already are open
-    if (digitalRead(LIMIT_OPEN) == LOW) {
-      if (iDebuglevel == 1 ) {
-        Serial.printf(";Debug Line %i: digitalRead(LIMIT_OPEN) == LOW \n",__LINE__);  
-        Serial.printf(";Debug Line %i: Already open\n",__LINE__);
-        Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
-      }
-      Serial.printf("n:open\n");
-      Serial.println("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
+  // Check for any passed parms and if get a rc=1 we had an invalid parm so exit.
+  if (CheckParms() == 1) {
+    if (iDebugLevel == 1 ) {
+      Serial.printf(";Debug Line %i: checkParms()\n",__LINE__);
     }
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
 
-    // Check for any passed parms and if get a rc=1 we had an invalid parm so exit.
-    if (checkParms() == 1) {
-      if (iDebuglevel == 1 ) {
-        Serial.printf(";Debug Line %i: checkParms()\n",__LINE__);
-      }
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
+  // If Magazine is caught between Open/CLose try to force closed
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
+    if (iDebugLevel == 1 ) {
+      Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH\n",__LINE__);
     }
-
-    // If Magazine is caught between Open/CLose try to force closed
-    if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
-      if (iDebuglevel == 1 ) {
-        Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH\n",__LINE__);
-      }
-      Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__);
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
-      while (digitalRead(LIMIT_CLOSE) == HIGH) {
-        #ifdef __ENABLE_INA219__
-        if (iDebuglevel == 1 ) {
-          read_ina219();
-        }
-        #endif
-      }
-      // wait for LIMIT_OPEN switch to go low and soon as it does we 
-      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-      Serial.printf("error\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
-
-    // No that the checks are done we can actually move the motor
-    if (digitalRead(LIMIT_CLOSE) == LOW) {
-      if (iDebuglevel == 1 ) // if debuging print some information
-      {
-        Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == LOW\n",__LINE__);
-        Serial.printf(";Debug Line %i: Not Open, Moving to open position\n",__LINE__);
-        Serial.printf(";Debug Line %i: S:%i A: %i\n",__LINE__,iSpeed,iAcceleration);
-      }
-
-      time1 = millis();
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
-
-      if (iDebuglevel == 1 ) {
-        Serial.printf(";Debug Line %i: S:%i A:%i D:%s\n",__LINE__,deltaprintr_motor.currentSpeed(),iAcceleration,deltaprintr_motor.currentDirection()?"backwards":"forward");
-      }
-      // Wait loop for limit to be hit
-      while (digitalRead(LIMIT_OPEN) == HIGH) // This is the main loop that waits for the LIMIT_OPEN switch to close 
-      {
-        #ifdef __ENABLE_INA219__
-          if ( iDebuglevel == 2 ) {
-            read_ina219();
-          }
-        #endif
-        time2 = millis(); // grap the current mS
-        if (GCode.availableValue('M')) // check if a M112 is sent and if so ESTOP  
-        {
-          int code = (int) GCode.GetValue('M');
-          if (code == 112) { // GOT ESTOP COMMAND
-            Serial.printf(";Line %i: Received M112 to E-STOP\n",__LINE__);
-            deltaprintr_motor.breakdown(0, 0);
-            Serial.printf("error\n");
-             bEstop = true;
-            #ifdef __ENABLE_NEOPIXEL__
-              neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-            #endif
-            digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
-            return; // Since we E-STOP we just exit              }
-          }
-        }
-          #ifdef __ENABLE_ESTOP_SWITCH__ // if we're using the ESTOP SWITCH check the ping and stop then return
-          if (Estopswitch.pressed()) {
-            deltaprintr_motor.breakdown(0, 0);
-            Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__);
-            Serial.printf("!estop\n");
-            bEstop = true;
-            #ifdef __ENABLE_NEOPIXEL__
-              neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-            #endif
-            return;
-          }
-          #endif
-          if ((time2 - time1) >= ulTimeout) // check if we've timed out and if so set error and return
-          {
-            Serial.printf(";Line %i: Timed out opening Nozzle\n",__LINE__);
-            Serial.printf("error\n");
-            bError = true;
-            deltaprintr_motor.breakdown(0, 0);
-            #ifdef __ENABLE_NEOPIXEL__
-              neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-            #endif
-            digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
-            return;
-          }
-      } // ends that main loop for the LIMIT_OPEN
-        deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-        time2 = millis();
-
-        if (iDebuglevel == 3 ) {
-          Serial.printf(";Debug Line %i: Move took %u(mS)\n",__LINE__,time2 - time1);
-        }
-      }
-      // now let user know we're open and things are OK.
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__) : Serial.printf(";Magazine Slide Caught between Open/Close: trying to recover\n");
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
+    while (digitalRead(LIMIT_CLOSE) == HIGH) {
       #ifdef __ENABLE_INA219__
-        fPeekCurrentmA = 0;
+      if (iDebugLevel == 1 ) {
+        ReadINA219();
+      }
       #endif
-      Serial.printf("n:open\n");
-      Serial.println("ok");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    }
+    // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+    Serial.printf("error\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
+
+  // Now that the checks are done we can actually move the motor
+  if (digitalRead(LIMIT_CLOSE) == LOW) {
+    if (iDebugLevel == 1 ) // if debuging print some information
+    {
+      Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == LOW\n",__LINE__);
+      Serial.printf(";Debug Line %i: Not Open, Moving to Open Position\n",__LINE__);
+      Serial.printf(";Debug Line %i: S:%i A: %i\n",__LINE__,iSpeed,iAcceleration);
+    }
+
+    time1 = millis();
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
+
+    if (iDebugLevel == 1 ) {
+      Serial.printf(";Debug Line %i: S:%i A:%i D:%s\n",__LINE__,deltaprintr_motor.currentSpeed(),iAcceleration,deltaprintr_motor.currentDirection()?"forward":"backward");
+    }
+    // Wait loop for limit to be hit
+    while (digitalRead(LIMIT_OPEN) == HIGH) // This is the main loop that waits for the LIMIT_OPEN switch to close 
+    {
+      #ifdef __ENABLE_INA219__
+        if ( iDebugLevel == 2 ) {
+          ReadINA219();
+        }
       #endif
-      digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
-      bEstop = false;
-      bError = false;
+      time2 = millis(); // grap the current mS
+      if (GCode.availableValue('M')) // check if a M112 is sent and if so ESTOP  
+      {
+        int code = (int) GCode.GetValue('M');
+        if (code == 112) { // GOT ESTOP COMMAND
+          ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Received M112 to E-STOP\n",__LINE__) : Serial.printf(";Received M112 to E-STOP\n");
+          deltaprintr_motor.breakdown(0, 0);
+          Serial.printf("error\n");
+            bEstop = true;
+          #ifdef __ENABLE_NEOPIXEL__
+            NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          #endif
+          digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+          return; // Since we E-STOP we just exit              }
+        }
+      }
+        #ifdef __ENABLE_ESTOP_BUTTON__ // if we're using the ESTOP SWITCH check the ping and stop then return
+        if (EStopButton.pressed()) {
+          deltaprintr_motor.breakdown(0, 0);
+          ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__) : Serial.printf(";Emergincy Stop Triggered\n");
+          Serial.printf("!estop\n");
+          bEstop = true;
+          #ifdef __ENABLE_NEOPIXEL__
+            NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          #endif
+          return;
+        }
+        #endif
+        if ((time2 - time1) >= ulTimeout) // check if we've timed out and if so set error and return
+        {
+          ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Timed out opening Nozzle\n",__LINE__) : Serial.printf(";Timed out opening Nozzle\n");
+          Serial.printf("error\n");
+          bError = true;
+          deltaprintr_motor.breakdown(0, 0);
+          #ifdef __ENABLE_NEOPIXEL__
+            NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          #endif
+          digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+          return;
+        }
+    } // ends that main loop for the LIMIT_OPEN
+      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+      time2 = millis();
+
+      if (iDebugLevel == 3 ) {
+        Serial.printf(";Debug Line %i: Move took %u(mS)\n",__LINE__,time2 - time1);
+      }
+    }
+    // now let user know we're open and things are OK.
+    #ifdef __ENABLE_INA219__
+      fPeekCurrentmA = 0;
+    #endif
+    Serial.printf("n:open\n");
+    Serial.println("ok");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+    bEstop = false;
+    bError = false;
 }
 
 //
-// M805_closeNozzlemagazine: Close the magazine or report open if already closed
+// M805_CloseNozzleMagazine: Close the magazine or report open if already closed
 //
- void M805_closeNozzleMagazine() {
+ void M805_CloseNozzleMagazine() {
       unsigned long time1 = 0, time2 = 0;
 
-      #ifdef __ENABLE_ESTOP_SWITCH__
-      if (bEstop == true) {
-        Serial.printf("E-STOP\n");
-        Serial.printf("error\n");
-        return;
-      } 
-      #endif 
+  if (bEstop == true) {
+      Serial.printf("E-STOP\n");
+      Serial.printf(";Cannot issue M804 while E-STOPPED\n");
+      Serial.printf("error\n");
+      return;
+  } 
 
-      digitalWrite(ACTIVITYLED, HIGH);
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      Serial.println("M805");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, HIGH);
 
-      // If the LIMIT_CLOSE is already set just exit since we already are closed
-      if (digitalRead(LIMIT_CLOSE) == LOW) {
-        if ( iDebuglevel == 1 ) {      
-          Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == LOW\n",__LINE__);
-          Serial.printf(";Debug Line %i: Already closed\n",__LINE__);
-          Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
-        }
-        Serial.printf("n:close\n");
-        Serial.printf("ok\n");
-        #ifdef __ENABLE_NEOPIXEL__
-          neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-        #endif
-        digitalWrite(ACTIVITYLED, LOW);
-        return;
+    Serial.println("M805");
+
+    // If the LIMIT_CLOSE is already set just exit since we already are closed
+    if (digitalRead(LIMIT_CLOSE) == LOW) {
+      if ( iDebugLevel == 1 ) {      
+        Serial.printf(";Debug Line %i: digitalRead(LIMIT_CLOSE) == LOW\n",__LINE__);
+        Serial.printf(";Debug Line %i: Already closed\n",__LINE__);
+        Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
       }
-
-      // Check for any passed parms
-      if (int i = checkParms() == 1) {
-        if (iDebuglevel == 1 ) {
-          Serial.printf(";Debug Line %i: checkParms() state=%i\n",__LINE__,i);
-        }
-        #ifdef __ENABLE_NEOPIXEL__
-          neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-        #endif
-        digitalWrite(ACTIVITYLED, LOW);
-        return;
-      }
-
-      // If Magazine is caught between Open/CLose force it to close
-      if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
-        Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__);
-        deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
-        while (digitalRead(LIMIT_OPEN) == HIGH) {} // wait for LIMIT_OPEN switch to go low and soon as it does we 
-        deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-        Serial.printf("error\n");
-        bError = true;
-        #ifdef __ENABLE_NEOPIXEL__
-          neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-        #endif
-        digitalWrite(ACTIVITYLED, LOW);
-        return;
-      }
-
-      // Now that the checks are done we can actually move the motor
-      if (digitalRead(LIMIT_OPEN) == LOW) {
-        if (iDebuglevel == 1 ) {
-          Serial.printf(";Debug Line %i: digitalRead(LIMIT_OPEN) == LOW\n",__LINE__);
-          Serial.printf(";Debug Line %i: Not Closed, Moving to Closed Position\n",__LINE__);
-          Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
-        }
-        time1 = millis();
-        deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
-        if (iDebuglevel == 1 ) {
-          Serial.printf(";Debug Line %i: S:%i A:%i D:%s\n",__LINE__,deltaprintr_motor.currentSpeed(),iAcceleration,deltaprintr_motor.currentDirection()?"backwards":"forward");
-        }
-        // Wait loop for limit to be hit
-        while (digitalRead(LIMIT_CLOSE) == HIGH) {
-          #ifdef __ENABLE_INA219__
-          if ( iDebuglevel == 2 ) {
-          read_ina219();
-          }
-          time2 = millis();
-          #endif
-          // timetmp = time2-time1;
-          #ifdef __ENABLE_ESTOP_SWITCH__
-          if (Estopswitch.pressed()) {
-            deltaprintr_motor.breakdown(0, 0);
-            Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__);
-            Serial.printf("error\n");
-            bEstop = true;
-            #ifdef __ENABLE_NEOPIXEL__
-              neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-            #endif
-          }
-          #endif
-          if ((time2 - time1) >= ulTimeout) {
-            Serial.printf(";Line %i: Timed out opening Nozzle\n",__LINE__);
-            Serial.printf("error\n");
-            bError = false;
-            #ifdef __ENABLE_NEOPIXEL__
-              neopixel_led(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-            #endif
-            deltaprintr_motor.breakdown(0, 0);
-            return;
-          }
-        } // wait for LIMIT_OPEN switch to go low and soon as it does we 
-        deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-      }
-      time2 = millis();
-      if (iDebuglevel == 3 ) {
-        Serial.printf(";Debug Line %i: Move took %u(mS)\n",__LINE__,(time2-time1));
-      }
-
-      // now let user know we're open and things are OK.
-      #ifdef __ENABLE_INA219__
-        fPeekCurrentmA = 0;
-      #endif 
-      Serial.printf("n:closed\n");
+      Serial.printf(";Already closed\n");
+      Serial.printf("n:close\n");
       Serial.printf("ok\n");
       #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+        NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
       #endif
       digitalWrite(ACTIVITYLED, LOW);
-      bEstop = false;
-      bError = false;
-
+      return;
     }
+
+    // Check for any passed parms
+    if (int i = CheckParms() == 1) {
+      if (iDebugLevel == 1 ) {
+        Serial.printf(";Debug Line %i: checkParms() state=%i\n",__LINE__,i);
+      }
+      #ifdef __ENABLE_NEOPIXEL__
+        NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+      digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
+
+    // If Magazine is caught between Open/CLose force it to close
+    if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__) : 
+        Serial.printf(";Magazine Slide Caught between Open/Close: trying to recover\n");
+      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
+      while (digitalRead(LIMIT_OPEN) == HIGH) {} // wait for LIMIT_OPEN switch to go low and soon as it does we 
+      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+      Serial.printf("error\n");
+      bError = true;
+      #ifdef __ENABLE_NEOPIXEL__
+        NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+      #endif
+      digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
+
+    // Now that the checks are done we can actually move the motor
+    if (digitalRead(LIMIT_OPEN) == LOW) {
+      if (iDebugLevel == 1 ) {
+        Serial.printf(";Debug Line %i: digitalRead(LIMIT_OPEN) == LOW\n",__LINE__);
+        Serial.printf(";Debug Line %i: Not Closed, Moving to Closed Position\n",__LINE__);
+        Serial.printf(";Debug Line %i: S:%i A:%i\n",__LINE__,iSpeed,iAcceleration);
+      }
+      time1 = millis();
+      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
+      if (iDebugLevel == 1 ) {
+        Serial.printf(";Debug Line %i: S:%i A:%i D:%s\n",__LINE__,deltaprintr_motor.currentSpeed(),iAcceleration,deltaprintr_motor.currentDirection()?"backwards":"forward");
+      }
+      // Wait loop for limit to be hit
+      while (digitalRead(LIMIT_CLOSE) == HIGH) {
+        #ifdef __ENABLE_INA219__
+        if ( iDebugLevel == 2 ) {
+        ReadINA219();
+        }
+        time2 = millis();
+        #endif
+        // timetmp = time2-time1;
+        #ifdef __ENABLE_ESTOP_BUTTON__
+        if (EStopButton.pressed()) {
+          deltaprintr_motor.breakdown(0, 0);
+          ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Emergincy Stop Triggered\n",__LINE__) : 
+            Serial.printf(";Emergincy Stop Triggered\n");
+          Serial.printf("error\n");
+          bEstop = true;
+          #ifdef __ENABLE_NEOPIXEL__
+            NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          #endif
+        }
+        #endif
+        if ((time2 - time1) >= ulTimeout) {
+          ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Timed out opening Nozzle\n",__LINE__) : 
+            Serial.printf(";Timed out opening Nozzle\n");
+          Serial.printf("error\n");
+          bError = false;
+          #ifdef __ENABLE_NEOPIXEL__
+            NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+          #endif
+          deltaprintr_motor.breakdown(0, 0);
+          return;
+        }
+      } // wait for LIMIT_OPEN switch to go low and soon as it does we 
+      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+    }
+    time2 = millis();
+    if (iDebugLevel == 3 ) {
+      Serial.printf(";Debug Line %i: Move took %u(mS)\n",__LINE__,(time2-time1));
+    }
+
+    // now let user know we're open and things are OK.
+    #ifdef __ENABLE_INA219__
+      fPeekCurrentmA = 0;
+    #endif 
+    Serial.printf("n:closed\n");
+    Serial.printf("ok\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW);
+    bError = false;
+}
  
 //
 // END callback functions,   all implemented as blocking calls
 //
 
-#ifdef __ENABLE_OC_SWITCH__
+#ifdef __ENABLE_OC_BUTTON__
 //
-// openNozzle:  Manuualy open the Nozzle via push button on controller
+// OpenNozzleMagazine:  Manuualy open the Nozzle via push button on controller
 //
-void openNozzleMagazine() {
+void OpenNozzleMagazine() {
+  
+  Serial.printf(";Open Button Pressed\n"); // echo the command
 
-    Serial.printf(";Open Button Pressed\n"); // echo the command
-    #ifdef __ENABLE_NEOPIXEL__
-      neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-    #endif
-    digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
-
-    if (bEstop == true) {
+  if (bEstop == true) {
       Serial.printf("E-STOP\n");
+      Serial.printf(";Cannot Open while E-STOPPED\n");
       Serial.printf("error\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
       return;
-    }
+  }
 
-    // If the LIMIT_OPEN is already set just exit since we already are open
-    if (digitalRead(LIMIT_OPEN) == LOW) {
-      Serial.printf(";Line %i: Already Open\n",__LINE__);
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
 
-    // If Magazine is caught between Open/CLose try to force closed
-    if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
-      Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__);
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
-      while (digitalRead(LIMIT_CLOSE) == HIGH) {}
-      // wait for LIMIT_OPEN switch to go low and soon as it does we 
-      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-      Serial.printf(";error\n");
-      bError = false;
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif  
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
+  // If the LIMIT_OPEN is already set just exit since we already are open
+  if (digitalRead(LIMIT_OPEN) == LOW) {
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Already Open\n",__LINE__) : 
+      Serial.printf(";Already Open\n");
+    Serial.printf("ok\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
 
-    // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
-    if (digitalRead(LIMIT_CLOSE) == LOW) {
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
+  // If Magazine is caught between Open/CLose try to force closed
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__) : 
+      Serial.printf(";Magazine Slide Caught between Open/Close: trying to recover\n");
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
+    while (digitalRead(LIMIT_CLOSE) == HIGH) {}
+    // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+    Serial.printf(";error\n");
+    bError = false;
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif  
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
 
-      while (digitalRead(LIMIT_OPEN) == HIGH) { 
-        #ifdef __ENABLE_INA219__
-        if ( iDebuglevel == 1 ) {
-          read_ina219();
-        }
-        #endif 
-      } // ends that main loop for the LIMIT_OPEN
-      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-    }
-      // now let user know we're open and things are OK.
-      #ifdef __ENABLE_INA219__      
-        fPeekCurrentmA = 0;
+  // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
+  if (digitalRead(LIMIT_CLOSE) == LOW) {
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
+    while (digitalRead(LIMIT_OPEN) == HIGH) { 
+      #ifdef __ENABLE_INA219__
+      if ( iDebugLevel == 3 ) {
+        ReadINA219();
+      }
       #endif 
-      Serial.printf("n:open\n");
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      bEstop = false;
-      bError = false;
-      digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+    } // ends that main loop for the LIMIT_OPEN
+    deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+  }
+    // now let user know we're open and things are OK.
+    #ifdef __ENABLE_INA219__      
+      fPeekCurrentmA = 0;
+    #endif 
+    Serial.printf("n:open\n");
+    Serial.printf("ok\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    bEstop = false;
+    bError = false;
+    digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
 }
 
 //
-// closeNozzle:  Manuualy close the Nozzle via push button on controller
+// CloseNozzleMagazine:  Manuualy close the Nozzle via push button on controller
 //
-void closeNozzleMagazine() {
+void CloseNozzleMagazine() {
 
     Serial.printf(";Close Button Pressed\n"); // echo the command
-    #ifdef __ENABLE_NEOPIXEL__
-      neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-    #endif
-    digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
 
-    if (bEstop == true) {
+  if (bEstop == true) {
       Serial.printf("E-STOP\n");
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-        digitalWrite(ACTIVITYLED, LOW);
+      Serial.printf(";Cannot Open while E-STOPPED\n");
+      Serial.printf("error\n");
       return;
-    }
+  }
 
-    // If the LIMIT_CLOSE is already closed just exit since we already are closed
-    if (digitalRead(LIMIT_CLOSE) == LOW) {
-      Serial.printf(";Line %i: Already Closed\n",__LINE__);
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
 
-    // If Magazine is caught between Open/CLose try to force closed
-    if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
-      Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__);
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
-      while (digitalRead(LIMIT_CLOSE) == HIGH) {}
-      // wait for LIMIT_OPEN switch to go low and soon as it does we 
-      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-      Serial.printf(";error\n");
-      bError = false;
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif  
-      digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
+  // If the LIMIT_CLOSE is already closed just exit since we already are closed
+  if (digitalRead(LIMIT_CLOSE) == LOW) {
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Already Closed\n",__LINE__) : 
+      Serial.printf(";Already Closed\n");
+    Serial.printf("ok\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
 
-    // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
-    if (digitalRead(LIMIT_OPEN) == LOW) {
-      deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
-      while (digitalRead(LIMIT_CLOSE) == HIGH) { 
-        #ifdef __ENABLE_INA219__
-        if ( iDebuglevel == 1 ) {
-          read_ina219();
-        }
-        #endif
-      } 
-      deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
-    }
-      // Now let user know we're open and things are OK.
+  // If Magazine is caught between Open/CLose try to force closed
+  if (digitalRead(LIMIT_CLOSE) == HIGH && digitalRead(LIMIT_OPEN) == HIGH) {
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Magazine Slide Caught between Open/Close: trying to recover\n",__LINE__) :
+      Serial.printf(";Magazine Slide Caught between Open/Close: trying to recover\n");
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_FORWARD, iAcceleration);
+    while (digitalRead(LIMIT_CLOSE) == HIGH) {}
+    // wait for LIMIT_OPEN switch to go low and soon as it does we 
+    deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+    Serial.printf(";error\n");
+    bError = false;
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif  
+    digitalWrite(ACTIVITYLED, LOW);
+    return;
+  }
+
+  // CHECK IF ITS OPEN AND IF SO CLOSE IT ELSE REPORT CLOSED
+  if (digitalRead(LIMIT_OPEN) == LOW) {
+    deltaprintr_motor.drive(iSpeed, deltaprintr_motor.DIRECTION_BACKWARD, iAcceleration);
+    while (digitalRead(LIMIT_CLOSE) == HIGH) { 
       #ifdef __ENABLE_INA219__
-        fPeekCurrentmA = 0;
+      if ( iDebugLevel == 1 ) {
+        ReadINA219();
+      }
       #endif
-      Serial.printf("n:closed\n");
-      Serial.printf("ok\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-      #endif
-      bEstop = false;
-      bError = false;
-      digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+    } 
+    deltaprintr_motor.breakdown(0, 0); // Default is Hard Stop (should I allow this to be overridden???)
+  }
+    // Now let user know we're open and things are OK.
+    #ifdef __ENABLE_INA219__
+      fPeekCurrentmA = 0;
+    #endif
+    Serial.printf("n:closed\n");
+    Serial.printf("ok\n");
+    #ifdef __ENABLE_NEOPIXEL__
+      NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+    #endif
+    bEstop = false;
+    bError = false;
+    digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
 }         
 #endif     
 
@@ -1116,25 +1185,25 @@ void setup() {
   pinMode(LIMIT_CLOSE, INPUT_PULLUP);
   pinMode(LIMIT_OPEN, INPUT_PULLUP);
 
-  #ifdef __ENABLE_OC_SWITCH__
+  #ifdef __ENABLE_OC_BUTTON__
     // CREATE BUTTONS
-    Openswitch.attach( OPEN_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
-    Closeswitch.attach( CLOSE_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+    OpenButton.attach( OPEN_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+    ClosesButton.attach( CLOSE_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
     
     // DEBOUNCE INTERVAL IN MILLISECONDS
-    Openswitch.interval(10);
-    Closeswitch.interval(10); 
+    OpenButton.interval(10);
+    ClosesButton.interval(10); 
   
     // INDICATE THAT THE LOW STATE CORRESPONDS TO PHYSICALLY PRESSING THE BUTTON
-    Openswitch.setPressedState(LOW);
-    Closeswitch.setPressedState(LOW); 
+    OpenButton.setPressedState(LOW);
+    ClosesButton.setPressedState(LOW); 
   #endif 
  
   // If the ESTOP is defined create the button with a 5ms debounce and active low 
-  #ifdef __ENABLE_ESTOP_SWITCH__
-    Estopswitch.attach( ESTOP_SWITCH ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
-    Estopswitch.interval(10);
-    Estopswitch.setPressedState(LOW);
+  #ifdef __ENABLE_ESTOP_BUTTON__
+    EStopButton.attach( ESTOP_BUTTON ,  INPUT_PULLUP ); // USE INTERNAL PULL-UP
+    EStopButton.interval(10);
+    EStopButton.setPressedState(LOW);
     bEstop = false;
   #endif
 
@@ -1142,7 +1211,8 @@ void setup() {
   #ifdef __ENABLE_INA219__
     Wire.begin();
     if( !ina219.init() ) {
-      Serial.printf(";Line %i: INA219 not connected!\n",__LINE__);
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: INA219 not connected!\n",__LINE__) : 
+        Serial.printf(";INA219 not connected!\n");
     }
 
   /* Set ADC Mode for Bus and ShuntVoltage
@@ -1197,53 +1267,59 @@ void setup() {
     strip.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
     strip.setBrightness(50);
     strip.show();  // Turn OFF all pixels ASAP
-    neopixel_led(NEOPIXEL_BLUE, NEOPIXEL_ON); // Now Show a BLue Pixel 
+    NeoPixelLed(NEOPIXEL_BLUE, NEOPIXEL_ON); // Now Show a BLue Pixel 
     strip_0.strip.begin();
   #endif  
+
+  #ifdef __ENABLE_FRAM__
+  // todo: enable storing of variables for recall at startup time.
+  // is this really worth anything???
+  #endif
+
 }
 
 void loop() {
   // see if there is a GCODE command available and if not we're waiting  
   (GCode.available()) ? bWaiting = false : bWaiting = true ; 
-
+  // GCode.BufferList[0].Value    
   // if ESTOP is defined get button and if pressed stop motor
-  #ifdef __ENABLE_ESTOP_SWITCH__
-    Estopswitch.update();
-    if (Estopswitch.pressed()) {
-      M112_estop();
+  #ifdef __ENABLE_ESTOP_BUTTON__
+    EStopButton.update();
+    if (EStopButton.pressed()) {
+      M112_EmergencyStop();
     }
-    if ( Estopswitch.released()) {
+    if ( EStopButton.released()) {
       bEstop = false;
       Serial.printf("E-STOP Cleared\n");
       Serial.printf("ok\n");
       #ifdef __ENABLE_NEOPIXEL__
-        neopixel_led(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+        NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
         iPulsespeed = 2000;
       #endif
       digitalWrite(ACTIVITYLED, LOW);
     }
   #endif
 
-  #ifdef __ENABLE_OC_SWITCH__
+  #ifdef __ENABLE_OC_BUTTON__
   // get button info
-    Openswitch.update();
-    Closeswitch.update();
+    OpenButton.update();
+    ClosesButton.update();
   
   // if the open button is pressed call openNozzleMagazine
-    if ( Openswitch.pressed() ) {
-      openNozzleMagazine();
+    if ( OpenButton.pressed() ) {
+      OpenNozzleMagazine();
     }
 
   // if the close button is pressed call closeNozzleMagazine
-    if (Closeswitch.pressed()) {
-      closeNozzleMagazine();
+    if (ClosesButton.pressed()) {
+      CloseNozzleMagazine();
     }
   #endif 
 
   // check several triggers for if the status led should be BLUE(OK) or RED (ERROR CONDITION)
   #ifdef __ENABLE_NEOPIXEL__
     if ( bEstop == false && bError == false && bWaiting == false ) {
-      neopixel_led(NEOPIXEL_BLUE, NEOPIXEL_ON);
+      NeoPixelLed(NEOPIXEL_BLUE, NEOPIXEL_ON);
     } 
     // else {
     //   neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF);
