@@ -44,7 +44,7 @@ void DRV8871::drive(byte targetSpeed, byte direction, int acceleration)
   //check if spped is 0, if yes direction is set to neutral
   if (_currentSpeed == 0)
   {
-    _currentDirection == DIRECTION_NONE;
+    _currentDirection = DIRECTION_NONE;
   }
 }
 
