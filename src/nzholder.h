@@ -52,9 +52,9 @@
   #define OPEN    true
   
   //
-  // Pin Configuration For Adafruit Metro Express
+  // Pin Configuration For KBOBS_NZMAG_BOARD based on Adafruit Metro M0 Express
   //
-  #ifdef ADAFRUIT_METRO_M0_EXPRESS
+  #ifdef KBOBS_NZMAG_BOARD
       #define MOTOR_IN1                 9
       #define MOTOR_IN2                 10
       #define LIMIT_CLOSE               11
@@ -74,14 +74,14 @@
       // Until I figure a way to set this array programaticaly you'll have to set it yourself
       // this prevents M42 from using PIN's assigned for the Nozzle Magazine Controler itself
       #define PINCOUNT                  8
-      int PinArrary[PINCOUNT] = { MOTOR_IN1, MOTOR_IN2, LIMIT_CLOSE, LIMIT_OPEN, ESTOP_BUTTON, OPEN_BUTTON, CLOSE_BUTTON, NEOPIXEL_PIN  };
+      int PinArrary[PINCOUNT] = { MOTOR_IN1, MOTOR_IN2, LIMIT_CLOSE, LIMIT_OPEN, ESTOP_BUTTON, OPEN_BUTTON, CLOSE_BUTTON, NEOPIXEL_PIN};
   #endif
 
   //
   // Pin Configuration For Adafruit Trinket M0 
   // Fewer Io Pins So Can't Do Everything At Same Time
   //
-  #ifdef ADAFRUIT_TRINKET_M0
+  #ifdef KBOBS_NZMAG_BOARD_TRINKET
       #define MOTOR_IN1               4
       #define MOTOR_IN2               5
       #define LIMIT_CLOSE             2
@@ -101,18 +101,24 @@
   // Standard: Camelcase
   // Gcode Callbacks: Gcodename_Camalecase 
   //
-  int CheckParms();                                     // Support Function To Read Common Parms               
+  int CheckParms();                                     // Support Function To Read Common Parms       
+  void(* resetFunc) (void) = 0;                         // Declare reset function at address 0        
   void G4_Dwell();                                      // G4 S<VALUE>
-  void M42_SetPinState();                                  // M42 - Set Pin State / M42 [M<0|1|2|3>] [P<pin>] S<state>
-  void M111_DebugLevel();                                    // M111 - Debug Level / M111 [S<flags>]
-  void M112_EmergencyStop();                                    // M112 - Emergency Stop / M112 [P<level>]
-  void M114_GetCurrentPosition();                            // M114 - Get Current Position / M114 [D] [E] [R]
-  void M115_FirmwareInfo();                           // M115 - Firmware Info / M115
-  void M119_EndstopStates();                             // M119 - Endstop States / M119
-  void M220_SetFeedratePercentage();                              // M220 - Set Feedrate Percentage / M220 S<VALUE> A<VALUE> D<VALUE>
-  void M303_PIDAutoTune();                                 // M303 - PID autotune / M303 C<count> D<action> D<flag> [E<index>] S<temp> U<flag> (TBD)
-  void M804_OpenNozzleMagazine();                       // M804 - Open Nozzle Magazine / M804 S<VALUE> A<VALUE> D<VALUE>
-  void M805_CloseNozzleMagazine();                      // M805 - Close Nozzle Magazine / M805 S<VALUE> A<VALUE> D<VALUE>
+  void M42_SetPinState();                               // M42 - Set Pin State / M42 [I<bool>] [F<0|1|2|3>] [P<pin>] S<state>
+  void M111_DebugLevel();                               // M111 - Debug Level / M111 [S<flags>]
+  void M112_EmergencyStop();                            // M112 - Emergency Stop / M112 [P<level>]
+  void M114_GetCurrentPosition();                       // M114 - Get Current Position / M114 
+  void M115_FirmwareInfo();                             // M115 - Firmware Info / M115
+  void M119_EndstopStates();                            // M119 - Endstop States / M119
+  void M220_SetFeedratePercentage();                    // M220 - Set Feedrate Percentage / M220 [S<VALUE>] [A<VALUE>] [D<VALUE>]
+  void M303_PIDAutoTune();                              // M303 - PID autotune / M303 [C<count>] [D<action>] [D<flag>] [E<index>] [S<temp>] [U<flag>] (TBD)
+  void M430_PowerMonitor();                             // M430 - Power Monitor / M430 [I<bool>] [V<bool>] [W<bool>]
+  void M500_SaveSetting();                              // M500 - Save Settings / M500 (TBD)
+  void M501_RestoreSettings();                          // M501 - Restore Settings / 501 (TBD)
+  void M502_FactoryReset();                             // M502 - Factory Reset / M502 (TBD)
+  void M804_OpenNozzleMagazine();                       // M804 - Open Nozzle Magazine / M804 [S<VALUE>] [A<VALUE>] [D<VALUE>]
+  void M805_CloseNozzleMagazine();                      // M805 - Close Nozzle Magazine / M805 [S<VALUE>] [A<VALUE>] [D<VALUE>]
+
 
   //
   // Variables
@@ -135,7 +141,7 @@
   //
   // How Many Commands Are Defined To Driver
   //
-  #define NumberOfCommands 11
+  #define NumberOfCommands 15
 
   //
   // Command Callbacks For Motor Driver
@@ -150,6 +156,10 @@
     { "M119", M119_EndstopStates          }, // M119
     { "M220", M220_SetFeedratePercentage  }, // M220 S[VALUE] A[MILLISECONDS] B[VALUE] T[VALUE] D[VALUE]
     { "M303", M303_PIDAutoTune            }, // M303 C[COUNT] NOT IMPLEMENTED
+    { "M430", M430_PowerMonitor           }, // M430 [I<bool>] [V<bool>] [W<bool>]
+    { "M500", M500_SaveSetting            }, // M500 (TBD)
+    { "M501", M501_RestoreSettings        }, // M501 (TBD)
+    { "M502", M502_FactoryReset           }, // M503 (TBD)
     { "M804", M804_OpenNozzleMagazine     }, // M804
     { "M805", M805_CloseNozzleMagazine    }  // M805 
   };

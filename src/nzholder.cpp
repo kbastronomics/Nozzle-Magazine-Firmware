@@ -327,6 +327,7 @@ void M42_SetPinState() {
   int iPinState=0;
   int iPin=0;
   int iResult=0;
+  int iBool=false;
 
   if (bEstop == true) {
       Serial.printf("E-STOP\n");
@@ -342,12 +343,12 @@ void M42_SetPinState() {
 
   Serial.printf("M42\n");
 
-  // if [M<VALUE>] this is the module #,  ie. M0,M1,M2,M3
-  if (GCode.availableValue('F')) {
-    iPinMode = (int) GCode.GetValue('F');
-    if ( iPinMode < 0 || iPinMode > 3 ) {
-      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: F(%i) Value out of range\n",__LINE__,iPinMode) : 
-        Serial.printf(";Error: F(%i) Value out of range\n",iPinMode);
+  // if [I<BOOL>] this is the ignore pin protection
+  if (GCode.availableValue('I')) {
+    iBool = (int) GCode.GetValue('I');
+    if ( iBool == 0 || iBool > 1 ) {
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: I(%i) value out of range\n",__LINE__,iBool) : 
+        Serial.printf(";Error: I(%i) value out of range\n",iBool);
       Serial.printf("error\n");
       #ifdef __ENABLE_NEOPIXEL__
         NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
@@ -357,41 +358,63 @@ void M42_SetPinState() {
       return;
     }
   }
-  
-  if (GCode.availableValue('P')) {
-    iPin = (int) GCode.GetValue('P');
-    if (iPin < 0 || iPin >= 50) {
-      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: P(%i) Value out of range\n",__LINE__,iPin) : 
-        Serial.printf(";Error: P(%i) Value out of range\n",iPin);
-      Serial.printf("error\n");
-      #ifdef __ENABLE_NEOPIXEL__
-        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
-      #endif
-      if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
-        digitalWrite(ACTIVITYLED, LOW);
-      return;
-    }
-  } 
 
-  for (int i=0; i < PINCOUNT; i++) {
-    if( PinArrary[i] == iPin ) {
-      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: P(%i) is a reserved pin\n",__LINE__,iPin) : 
-        Serial.printf(";Error: P(%i) is a reserved pin\n",iPin);
+  // if [F<VALUE>] this is the PINMODE #,  ie. F0,F1,F2,F3 (due to the  gcode driver can't use a M parm)
+  if (GCode.availableValue('F')) {
+    iPinMode = (int) GCode.GetValue('F');
+    if ( iPinMode < 0 || iPinMode > 3 ) {
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: PINMODE(%i) is not valid\n",__LINE__,iPinMode) : 
+        Serial.printf(";Error: PINMODE(%i) is not valid\n",iPinMode);
       Serial.printf("error\n");
       #ifdef __ENABLE_NEOPIXEL__
         NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
       #endif
-      if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
-        digitalWrite(ACTIVITYLED, LOW);
+      if( iPin != ACTIVITYLED) // doing this if your trying to control the LED_BUILTIN
+        digitalWrite(ACTIVITYLED, LOW); 
       return;
     }
   }
+  // for the Pin first we get the pin number and check for a valid range 0-50 for round numbers send a error message if out of range
+  if (GCode.availableValue('P')) {
+    iPin = (int) GCode.GetValue('P');
+    if (iPin < 0 || iPin >= 50) {
+      ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: PIN(%i) value out of range\n",__LINE__,iPin) : 
+        Serial.printf(";Error: PIN(%i) value out of range\n",iPin);
+      Serial.printf("error\n");
+      #ifdef __ENABLE_NEOPIXEL__
+        NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+      #endif
+      if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
+        digitalWrite(ACTIVITYLED, LOW);
+      return;
+    }
+  } else {
+    iPin = ACTIVITYLED; // If Not Pin is passed assume LED
+  }
 
+// we don't want M42 to override the pins used for the controller so check if the pin requested is one and if so send an error message
+  if ( iBool == false ) {   // if user choose to ignore pin protect skip this otherwise protect it.
+    for (int i=0; i < PINCOUNT; i++) {  
+      if( PinArrary[i] == iPin ) {
+        ( iDebugLevel > 0) ? Serial.printf(";Line %i: Error: PIN(%i) is a reserved pin\n",__LINE__,iPin) : 
+          Serial.printf(";Error: PIN(%i) is a reserved pin\n",iPin);
+        Serial.printf("error\n");
+        #ifdef __ENABLE_NEOPIXEL__
+          NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
+        #endif
+        if( iPin != ACTIVITYLED)  // doing this if your trying to control the LED_BUILTIN
+          digitalWrite(ACTIVITYLED, LOW);
+        return;
+      }
+    }
+  }
+
+  // get the S value and allow for up to 10bit 
   if (GCode.availableValue('S')) {
     iPinState = (int) GCode.GetValue('S');
-    if (iPinState < 0 || iPinState >= 255) {
-      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: S(%i) Value out of range",__LINE__,iPinState) : 
-        Serial.printf(";Error: S(%i) Value out of range",iPinState);
+    if (iPinState < 0 || iPinState >= 1024) {
+      ( iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: S(%i) value out of range",__LINE__,iPinState) : 
+        Serial.printf(";Error: S(%i) value out of range",iPinState);
       Serial.println("error");
       #ifdef __ENABLE_NEOPIXEL__
         NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_OFF); // turn off the neopixel,  we're done
@@ -402,15 +425,18 @@ void M42_SetPinState() {
     }
   } 
 
+  // check for valid PINMODES and do the requested action
   switch(iPinMode) {
     case 0:
       pinMode(iPin,INPUT);
       iResult = digitalRead(iPin);
       break;
-    case 1:
+    case 1:   
       pinMode(iPin,OUTPUT);
-      digitalWrite(iPin,iPinState);
-      // todo:  account for analog outputs
+      if ( iPinState <=1 )  
+        digitalWrite(iPin,iPinState);
+      else
+        analogWrite(iPin,iPinState);
       break;
     case 2:
       pinMode(iPin,INPUT_PULLUP);
@@ -427,9 +453,9 @@ void M42_SetPinState() {
   }
   
   if ( iPinMode != 1 ) {
-    Serial.printf("P:%i R:%i\n",iPin,iResult);
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i P:%i R:%i\n",__LINE__,iPin,iResult) : Serial.printf("P:%i R:%i\n",iPin,iResult);
   } else {
-    Serial.printf("P:%i W:%i\n",iPin,iPinState);
+    ( iDebugLevel > 0 ) ? Serial.printf(";Line %i P:%i W:%i\n",__LINE__,iPin,iPinState) : Serial.printf("P:%i W:%i\n",iPin,iPinState);
   }
 
   Serial.printf("ok\n");
@@ -456,7 +482,7 @@ void M111_DebugLevel() {
   // if [S<VALUE<] this is debug level (S0=OFF, S1=Messages, S2=S1+INA219, S3=S1+TIMMING) 
   iDebugLevel = (int) (GCode.availableValue('S')) ? GCode.GetValue('S') : 0 ;
   
-  Serial.printf(";Debug Level S(%i)\n",iDebugLevel);
+  Serial.printf(";Debug Level S%i\n",iDebugLevel);
   Serial.printf("ok\n");
   
   #ifdef __ENABLE_NEOPIXEL__
@@ -732,6 +758,117 @@ void M303_PIDAutoTune() {
 }
 
 //
+// M500 - Save Settings / M500 (TBD)
+//
+void M500_SaveSetting() {
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
+  Serial.printf("M500\n");
+  Serial.printf("Function not implemented\n");
+  Serial.printf("error\n");
+
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, LOW); // signal that we are in the routine
+}                              
+
+//
+// M501_RestoreSettings: M501 - Restore Settings
+//
+void M501_RestoreSettings() { 
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
+  Serial.printf("M501\n");
+  Serial.printf("Function not implemented\n");
+  Serial.printf("error\n");
+
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, LOW); // signal that we are in the routine
+}                          
+
+#ifdef __ENABLE_INA219__
+//
+// M430_PowerMonitor: M430 - Power Monitor / M430 [I<bool>] [V<bool>] [W<bool>]
+//
+void M430_PowerMonitor() {
+  fBusvoltage = ina219.getBusVoltage_V();
+  fCurrentmA = ina219.getCurrent_mA();
+  fPowermW = ina219.getBusPower();
+  bIna219overflow = ina219.getOverflow();
+  int iCurrent=false;
+  int iVoltage=false;
+  int iPower=false;
+
+  //(bIna219overflow) ? Serial.println("Overflow! Choose higher PGAIN") : 
+
+  if (GCode.availableValue('V')) {
+    iVoltage = (bool) GCode.GetValue('V');
+    if (iVoltage < 0 || iVoltage > 1) {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: V%i out of range\n",__LINE__,iVoltage) : 
+        Serial.printf(";Error: V%i out of range\n",iVoltage);
+      Serial.println("error");
+      return;
+    } else {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: V:%3.2f Vdc \n",__LINE__,fBusvoltage) : 
+        Serial.printf("V:%3.2f Vdc\n",fBusvoltage);
+    }
+  }
+
+  if (GCode.availableValue('I')) {
+    iCurrent = (bool) GCode.GetValue('I');
+    if (iCurrent < 0 || iCurrent > 1) {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: I%i out of range\n",__LINE__,iCurrent) : 
+        Serial.printf(";Error: I%i out of range\n",iCurrent);
+      Serial.println("error");
+      return;
+    } else {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: I:%3.2f mA \n",__LINE__,fCurrentmA) : 
+        Serial.printf("I:%3.2f mA\n",fCurrentmA);
+    }
+  }
+
+  if (GCode.availableValue('W')) {
+    iPower = (bool) GCode.GetValue('W');
+    if (iPower < 0 || iPower > 1) {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: Error: W%i out of range\n",__LINE__,iPower) : 
+        Serial.printf(";Error: W%i out of range\n",iPower);
+      Serial.println("error");
+      return;
+    } else {
+      (iDebugLevel > 0 ) ? Serial.printf(";Line %i: W:%3.2f mW\n",__LINE__,fPowermW) : 
+        Serial.printf("W:%3.2f mW\n",fPowermW);
+    }
+  }
+  Serial.printf("ok\n");
+}
+#endif 
+
+//
+// M502_FactoryReset:  Experimental Code for a software called reset,  not working, do not call will freeze controler
+//
+void M502_FactoryReset() {
+  #ifdef __ENABLE_NEOPIXEL__
+    NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
+  #endif
+  digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
+  Serial.printf("M502\n");
+  Serial.printf(";Forcing Reset after 3 second delay\n");
+  Serial.printf("ok\n");
+  delay(3000);
+  Serial.printf(";So it didn't work, dooh!\n");
+}
+
+//
 // M804_OpenNozzleMagazine:  Open the magazine or report open if already open
 //
 void M804_OpenNozzleMagazine() {
@@ -748,7 +885,12 @@ void M804_OpenNozzleMagazine() {
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
   Serial.printf("M804\n"); // echo the command
+
+  if (CheckParms() == 1) { // ERROR So do nothing
+    return;
+  }
 
   // If the LIMIT_OPEN is already set just exit since we already are open
   if (digitalRead(LIMIT_OPEN) == LOW) {
@@ -907,6 +1049,10 @@ void M804_OpenNozzleMagazine() {
     digitalWrite(ACTIVITYLED, HIGH);
 
     Serial.println("M805");
+
+    if (CheckParms() == 1) { // ERROR So do nothing
+      return;
+    }
 
     // If the LIMIT_CLOSE is already set just exit since we already are closed
     if (digitalRead(LIMIT_CLOSE) == LOW) {
