@@ -22,6 +22,7 @@
 #define nzholder_h
 
   #include <Arduino.h>
+  #include <SPI.h>
 
   #include <DRV8871.h>    // https://github.com/dirkk1980/arduino_adafruit-drv8871
   #include <gcode.h>      // https://github.com/tinkersprojects/G-Code-Arduino-Library
@@ -55,6 +56,7 @@
   // Pin Configuration For KBOBS_NZMAG_BOARD based on Adafruit Metro M0 Express
   //
   #ifdef KBOBS_NZMAG_BOARD
+      #define SAMD_SD                   PIN_A2
       #define MOTOR_IN1                 9
       #define MOTOR_IN2                 10
       #define LIMIT_CLOSE               11
@@ -73,26 +75,11 @@
 
       // Until I figure a way to set this array programaticaly you'll have to set it yourself
       // this prevents M42 from using PIN's assigned for the Nozzle Magazine Controler itself
-      #define PINCOUNT                  8
-      int PinArrary[PINCOUNT] = { MOTOR_IN1, MOTOR_IN2, LIMIT_CLOSE, LIMIT_OPEN, ESTOP_BUTTON, OPEN_BUTTON, CLOSE_BUTTON, NEOPIXEL_PIN};
-  #endif
+      #define PINCOUNT                  9
+      int PinArrary[PINCOUNT] = { SAMD_SD, MOTOR_IN1, MOTOR_IN2, LIMIT_CLOSE, LIMIT_OPEN, ESTOP_BUTTON, OPEN_BUTTON, CLOSE_BUTTON, NEOPIXEL_PIN};
 
-  //
-  // Pin Configuration For Adafruit Trinket M0 
-  // Fewer Io Pins So Can't Do Everything At Same Time
-  //
-  #ifdef KBOBS_NZMAG_BOARD_TRINKET
-      #define MOTOR_IN1               4
-      #define MOTOR_IN2               5
-      #define LIMIT_CLOSE             2
-      #define LIMIT_OPEN              3
-      #ifdef __ENABLE_ESTOP_BUTTON__
-          #define ESTOP_BUTTON        0
-      #endif
-      #define ACTIVITYLED             LED_BUILTIN
-      #ifdef __ENABLE_NEOPIXEL__
-          #define NEOPIXEL_PIN        NEOPIXEL_BUILTIN
-      #endif 
+      #define SAMD_SD_POWER_ON     digitalWrite(SAMD_SD,HIGH)     
+      #define SAMD_SD_POWER_OFF    digitalWrite(SAMD_SD,LOW)
   #endif
 
   //
@@ -141,8 +128,11 @@
   //
   // How Many Commands Are Defined To Driver
   //
-  #define NumberOfCommands 15
-
+  #ifdef __ENABLE_FRAM__
+    #define NumberOfCommands 15
+  #else
+    #define NumberOfCommands 13
+  #endif
   //
   // Command Callbacks For Motor Driver
   //
@@ -155,11 +145,13 @@
     { "M115", M115_FirmwareInfo           }, // M115
     { "M119", M119_EndstopStates          }, // M119
     { "M220", M220_SetFeedratePercentage  }, // M220 S[VALUE] A[MILLISECONDS] B[VALUE] T[VALUE] D[VALUE]
-    { "M303", M303_PIDAutoTune            }, // M303 C[COUNT] NOT IMPLEMENTED
+    { "M303", M303_PIDAutoTune            }, // M303 I[VALUE] S[BOOL]  
     { "M430", M430_PowerMonitor           }, // M430 [I<bool>] [V<bool>] [W<bool>]
-    { "M500", M500_SaveSetting            }, // M500 (TBD)
-    { "M501", M501_RestoreSettings        }, // M501 (TBD)
-    { "M502", M502_FactoryReset           }, // M503 (TBD)
+    #ifdef __ENABLE_FRAM__
+    { "M500", M500_SaveSetting            }, // M500 
+    { "M501", M501_RestoreSettings        }, // M501 
+    #endif 
+    { "M502", M502_FactoryReset           }, // M503 
     { "M804", M804_OpenNozzleMagazine     }, // M804
     { "M805", M805_CloseNozzleMagazine    }  // M805 
   };
@@ -176,12 +168,12 @@
       #include <Wire.h>
       #include <INA219_WE.h>  // https://github.com/wollewald/INA219_WE
                               // https://learn.adafruit.com/adafruit-metro-m0-express/pinouts
-      #define I2C_ADDRESS 0x40
+      #define INA219_I2C_ADDRESS 0x40
       #define MINBUSVOLTAGE 8.0 
 
       void ReadINA219(); // Declare The Function Since Its Now Being Used
 
-      INA219_WE ina219 = INA219_WE(I2C_ADDRESS);
+      INA219_WE ina219 = INA219_WE(INA219_I2C_ADDRESS);
 
       // Define Some Global Variables.   Maybe Move Into A Structure Instead???
       float fTotalmA;
@@ -268,7 +260,24 @@
   // Why FRAM:   Because I Have Several On Hand
   // 
   #ifdef __ENABLE_FRAM__
-   
+    #include <Adafruit_I2CDevice.h>
+    #define FRAM_I2C_ADDRESS 0x60
+
+    typedef struct FramMemory {
+      int iSpeed;               // Max Value To Not Stall @ 12V VMotor,  220 @ 9V VMotor 
+      int iAcceleration;        // No Acceleration Delay
+      int iBrake;               // Stop Immediate
+      int iDebugLevel;          // L[LEVEL] Where 0=Off, 1=trace, 2=ina219 output, 3=O/C Timing
+      unsigned long ulTimeout;  // Default Timeout Value Of 2 Seconds
+      bool bEstop;              // Are We ESTOPPED?
+      bool bError;              // Are We In A Error Condition
+      bool bWaiting;            // Are We Waiting For A Command
+    } framStorage;
+
+    Adafruit_I2CDevice fram = Adafruit_I2CDevice(FRAM_I2C_ADDRESS);
+
+    framStorage FramStorage;
+
   #endif
 
   //

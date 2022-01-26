@@ -513,7 +513,7 @@ void M112_EmergencyStop() {
         Serial.printf("ok\n");
         #ifdef __ENABLE_NEOPIXEL__
           NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON); // LED IS RED DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-          iPulsespeed = 600;
+          iPulsespeed = PULSEFAST;
         #endif
         digitalWrite(ACTIVITYLED, LOW);
         break;
@@ -523,7 +523,7 @@ void M112_EmergencyStop() {
         Serial.printf("ok\n");
         #ifdef __ENABLE_NEOPIXEL__
           NeoPixelLed(NEOPIXEL_BLUE, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-          iPulsespeed = 2000;
+          iPulsespeed = PULSESLOW;
         #endif
         digitalWrite(ACTIVITYLED, LOW);
         return;
@@ -533,15 +533,17 @@ void M112_EmergencyStop() {
         Serial.printf("error\n");
         #ifdef __ENABLE_NEOPIXEL__
           NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-          iPulsespeed = 2000;
+          iPulsespeed = PULSESLOW;
         #endif
         digitalWrite(ACTIVITYLED, LOW);
         return;          
         break;
     } // Switch
   } // Case
+
   bEstop = !bEstop; // If M112 issue without S[BOOL] just Toggle bEstop flag
   deltaprintr_motor.breakdown(0, 0);
+
   if ( bEstop == true ) {
     Serial.printf("E-STOP\n");
     #ifdef __ENABLE_NEOPIXEL__
@@ -757,10 +759,12 @@ void M303_PIDAutoTune() {
   digitalWrite(ACTIVITYLED, LOW);
 }
 
+#ifdef __ENABLE_FRAM__
 //
 // M500 - Save Settings / M500 (TBD)
 //
 void M500_SaveSetting() {
+  uint8_t buffer[32];
   #ifdef __ENABLE_NEOPIXEL__
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
@@ -769,6 +773,15 @@ void M500_SaveSetting() {
   Serial.printf("M500\n");
   Serial.printf("Function not implemented\n");
   Serial.printf("error\n");
+
+  // Save Important Vars to FRAM
+  buffer[0] = 0x0C;  // we'll reuse the same buffer
+  fram.write_then_read(buffer, 1, buffer, 2, false);
+  Serial.print("Write then Read: ");
+  for (uint8_t i=0; i<2; i++) {
+    Serial.print("0x"); Serial.print(buffer[i], HEX); Serial.print(", ");
+  }
+  Serial.println();
 
   #ifdef __ENABLE_NEOPIXEL__
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
@@ -793,7 +806,8 @@ void M501_RestoreSettings() {
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, LOW); // signal that we are in the routine
-}                          
+}       
+#endif                    
 
 #ifdef __ENABLE_INA219__
 //
@@ -807,6 +821,7 @@ void M430_PowerMonitor() {
   int iCurrent=false;
   int iVoltage=false;
   int iPower=false;
+  bool bNoval=true;
 
   //(bIna219overflow) ? Serial.println("Overflow! Choose higher PGAIN") : 
 
@@ -817,11 +832,12 @@ void M430_PowerMonitor() {
         Serial.printf(";Error: V%i out of range\n",iVoltage);
       Serial.println("error");
       return;
-    } else {
+    } else {  // got a value bool so report 
       (iDebugLevel > 0 ) ? Serial.printf(";Line %i: V:%3.2f Vdc \n",__LINE__,fBusvoltage) : 
         Serial.printf("V:%3.2f Vdc\n",fBusvoltage);
+      bNoval=false;
     }
-  }
+  } 
 
   if (GCode.availableValue('I')) {
     iCurrent = (bool) GCode.GetValue('I');
@@ -833,8 +849,9 @@ void M430_PowerMonitor() {
     } else {
       (iDebugLevel > 0 ) ? Serial.printf(";Line %i: I:%3.2f mA \n",__LINE__,fCurrentmA) : 
         Serial.printf("I:%3.2f mA\n",fCurrentmA);
+      bNoval=false;
     }
-  }
+  } 
 
   if (GCode.availableValue('W')) {
     iPower = (bool) GCode.GetValue('W');
@@ -846,9 +863,16 @@ void M430_PowerMonitor() {
     } else {
       (iDebugLevel > 0 ) ? Serial.printf(";Line %i: W:%3.2f mW\n",__LINE__,fPowermW) : 
         Serial.printf("W:%3.2f mW\n",fPowermW);
+      bNoval=false;
     }
-  }
-  Serial.printf("ok\n");
+  } 
+
+  if (!bNoval) {
+    Serial.printf("ok\n");
+    } else {
+    Serial.printf(";Missing Parm\n");
+    Serial.printf("error\n");
+  } 
 }
 #endif 
 
@@ -885,6 +909,8 @@ void M804_OpenNozzleMagazine() {
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
+  SAMD_SD_POWER_ON;   // Turn on VMotor Supply
 
   Serial.printf("M804\n"); // echo the command
 
@@ -1026,7 +1052,7 @@ void M804_OpenNozzleMagazine() {
       NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
     digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
-    bEstop = false;
+    SAMD_SD_POWER_OFF;   // Turn off VMotor Supply
     bError = false;
 }
 
@@ -1042,6 +1068,8 @@ void M804_OpenNozzleMagazine() {
       Serial.printf("error\n");
       return;
   } 
+
+    SAMD_SD_POWER_ON;   // Turn on VMotor Supply
 
     #ifdef __ENABLE_NEOPIXEL__
       NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
@@ -1161,6 +1189,7 @@ void M804_OpenNozzleMagazine() {
       NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
     #endif
     digitalWrite(ACTIVITYLED, LOW);
+    SAMD_SD_POWER_OFF;   // Turn off VMotor Supply
     bError = false;
 }
  
@@ -1187,6 +1216,8 @@ void OpenNozzleMagazine() {
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
   #endif
   digitalWrite(ACTIVITYLED, HIGH); // signal that we are in the routine
+
+  SAMD_SD_POWER_ON;   // Turn on VMotor Supply
 
   // If the LIMIT_OPEN is already set just exit since we already are open
   if (digitalRead(LIMIT_OPEN) == LOW) {
@@ -1240,7 +1271,8 @@ void OpenNozzleMagazine() {
     #endif
     bEstop = false;
     bError = false;
-    digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+    digitalWrite(ACTIVITYLED, LOW);   // turn LED off to show we're out of the routine
+    SAMD_SD_POWER_OFF;                // Turn off VMotor Supply
 }
 
 //
@@ -1256,6 +1288,8 @@ void CloseNozzleMagazine() {
       Serial.printf("error\n");
       return;
   }
+
+  SAMD_SD_POWER_ON;   // Turn on  VMotor Supply
 
   #ifdef __ENABLE_NEOPIXEL__
     NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_ON); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
@@ -1315,6 +1349,7 @@ void CloseNozzleMagazine() {
     bEstop = false;
     bError = false;
     digitalWrite(ACTIVITYLED, LOW); // turn LED off to show we're out of the routine
+    SAMD_SD_POWER_OFF;              // Turn off VMotor Supply
 }         
 #endif     
 
@@ -1330,6 +1365,19 @@ void setup() {
   pinMode(ACTIVITYLED, OUTPUT);
   pinMode(LIMIT_CLOSE, INPUT_PULLUP);
   pinMode(LIMIT_OPEN, INPUT_PULLUP);
+  pinMode(SAMD_SD,OUTPUT);
+
+  #ifdef __ENABLE_FRAM__
+    if (!fram.begin()) {
+      Serial.printf("Did not find FRAM at 0x%x\n",fram.address());
+    } else {
+      Serial.printf("FRAM found on address 0x%x",fram.address());
+         // if we get this far and fram is found we load our config
+    }
+  #endif
+
+  // Turn off VMotor/12V Supply via SAMD_SD Pin
+  SAMD_SD_POWER_OFF;   
 
   #ifdef __ENABLE_OC_BUTTON__
     // CREATE BUTTONS
@@ -1440,7 +1488,7 @@ void loop() {
       Serial.printf("ok\n");
       #ifdef __ENABLE_NEOPIXEL__
         NeoPixelLed(NEOPIXEL_GREEN, NEOPIXEL_OFF); // LED IS BLUE DURING MAIN LOOP,  GREEN WHEN EXECUTING COMMAND AND RED ON ERROR
-        iPulsespeed = 2000;
+        iPulsespeed = PULSESLOW;
       #endif
       digitalWrite(ACTIVITYLED, LOW);
     }
@@ -1467,9 +1515,16 @@ void loop() {
     if ( bEstop == false && bError == false && bWaiting == false ) {
       NeoPixelLed(NEOPIXEL_BLUE, NEOPIXEL_ON);
     } 
-    // else {
-    //   neopixel_led(NEOPIXEL_RED, NEOPIXEL_OFF);
-    // }
+
+    if ( bEstop == true && bWaiting == false ) {
+      NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON);
+      iPulsespeed = PULSEFAST;
+    }   
+
+    if ( bError == true && bWaiting == false ) {
+      NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON);
+      iPulsespeed = PULSEFAST;
+    }   
 
     // this should only be called after a timeout value
     if ( bWaiting == true ) { 

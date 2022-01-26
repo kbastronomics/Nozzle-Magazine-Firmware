@@ -17,7 +17,7 @@
 
 typedef void (*CallbackFunction) ();
 
-typedef struct commandscallback {
+struct commandscallback {
     String value;
     CallbackFunction Callback;
 };
