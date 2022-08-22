@@ -3,6 +3,10 @@
         {
             "name": "Nozzle Magazine Firmware",
             "path": "."
+        },
+        {
+            "name": "MachSTDMillv3",
+            "path": "..\\MachSTDMillv3"
         }
     ]
 }

@@ -277,7 +277,6 @@
     Adafruit_I2CDevice fram = Adafruit_I2CDevice(FRAM_I2C_ADDRESS);
 
     framStorage FramStorage;
-
   #endif
 
   //

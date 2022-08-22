@@ -1466,10 +1466,14 @@ void setup() {
   #endif  
 
   #ifdef __ENABLE_FRAM__
-  // todo: enable storing of variables for recall at startup time.
-  // is this really worth anything???
+  if (!fram.begin()) {
+      Serial.printf("Did not find fram at 0x%n\n",fram.address());
+      fram_enabled=false;
+    } else {
+      Serial.printf("FRAM found at 0x%n\n",fram.address());
+      fram_enabled=true;
+    }
   #endif
-
 }
 
 void loop() {
@@ -1518,11 +1522,6 @@ void loop() {
 
     if ( bEstop == true && bWaiting == false ) {
       NeoPixelLed(NEOPIXEL_RED, NEOPIXEL_ON);
-      iPulsespeed = PULSEFAST;
-    }   
-
-    if ( bError == true && bWaiting == false ) {
-      NeoPixelLed(NEOPIXEL_AMBER, NEOPIXEL_ON);
       iPulsespeed = PULSEFAST;
     }   
 
